@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shengchengzi"
+version = "0.1.0"
+description = "Generative AI toolkit for various tasks involving Chinese characters"
+authors = [
+    { name = "AJ Wisniewski" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/awisniewski21/ShengChengZi"
+Repository = "https://github.com/awisniewski21/ShengChengZi"

@@ -1,0 +1,10 @@
+diffusers
+einops
+numpy<2.*
+pandas
+Pillow
+setuptools
+torch
+torchvision
+tqdm
+transformers
