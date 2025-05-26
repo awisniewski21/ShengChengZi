@@ -14,8 +14,9 @@ class DiffusionPipelineRand2Char(DDPMPipeline):
     Pipeline for image generation
     """
 
-    def evaluate_texts_to_image_grid(self, *args, **kwargs):
-        imgs = self(*args, **kwargs).images
+    def evaluate_texts_to_image_grid(self, *args, generator=None, seed: int = 0, **kwargs):
+        gen_device = self.device if self.device not in ["cpu", "mps"] else "cpu"
+        imgs = self(*args, generator=torch.Generator(device=gen_device).manual_seed(seed), **kwargs).images
         return np.tile((255 * imgs).clip(0, 255).astype(np.uint8), (1, 1, 1, 3))
 
 
@@ -36,7 +37,7 @@ class DiffusionPipelineText2Char(DDPMPipeline):
         num_inference_steps: int = 1000,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-    ) -> Union[ImagePipelineOutput, Tuple]:      
+    ) -> Union[ImagePipelineOutput, Tuple]:
         if isinstance(self.unet.config.sample_size, int):
             image_shape = (batch_size, self.unet.config.in_channels, self.unet.config.sample_size, self.unet.config.sample_size)
         else:
@@ -67,6 +68,7 @@ class DiffusionPipelineText2Char(DDPMPipeline):
 
         return ImagePipelineOutput(images=image)
 
-    def evaluate_texts_to_image_grid(self, texts: List[str], text_encoder: str = "google-t5/t5-small", *args, **kwargs):
-        imgs = self(texts, text_encoder=text_encoder, *args, **kwargs).images
+    def evaluate_texts_to_image_grid(self, texts: List[str], text_encoder: str = "google-t5/t5-small", *args, generator=None, seed: int = 0, **kwargs):
+        gen_device = self.device if self.device not in ["cpu", "mps"] else "cpu"
+        imgs = self(texts, text_encoder=text_encoder, *args, generator=torch.Generator(device=gen_device).manual_seed(seed), **kwargs).images
         return np.tile((255 * imgs).clip(0, 255).astype(np.uint8), (1, 1, 1, 3))
