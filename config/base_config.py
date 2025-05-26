@@ -5,7 +5,7 @@ from utils.utils import get_repo_dir
 
 
 @dataclass
-class TrainingConfig:
+class TrainingConfigBase:
     """ Dataset """
     image_size: int = 128                       # Image resolution
 
@@ -16,12 +16,6 @@ class TrainingConfig:
     learning_rate: float = 1e-4                 # Model learning rate
     lr_warmup_steps: int = 500                  # Gradually increase lr to full value over first N steps
     seed: int = 0                               # Seed for random number generators
-
-    """ Model Params """
-    text_encoder: str = "google-t5/t5-small"    # Text encoder model name
-    gradient_accumulation_steps: int = 1        # Allows for larger batch sizes that wouldn't fit in memory
-    encoder_dim: int = 1024                     # Encoder dimensions
-    mixed_precision: str = "fp16"               # Set to 'no' for float32 or 'fp16' for automatic mixed precision
 
     """ Logging """
     output_dir: str = "out"                     # Output directory

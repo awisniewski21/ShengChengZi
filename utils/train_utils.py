@@ -1,184 +1,101 @@
-from typing import List, Optional, Tuple, Union
+import glob
+import json
+from pathlib import Path
+from typing import Callable, Dict, List, Tuple
 
 import torch
-from diffusers.pipelines.pipeline_utils import DiffusionPipeline, ImagePipelineOutput  # NOQA
-from diffusers.utils.torch_utils import randn_tensor
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
-from torchvision import transforms as T
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.dataloader import default_collate
+from torchvision import datasets, transforms
+from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from config.config import TrainingConfig
+from config.base_config import TrainingConfigBase
 from models import t5
+from utils.utils import get_repo_dir
 
 
-# Collator adjusted for local dataset
-class Collator:
-    def __init__(self, image_size, text_label, image_label, name, channels):
-        self.text_label = text_label
-        self.image_label = image_label
-        self.name = name
-        self.channels = channels
-        self.transform = T.Compose([
-            T.Resize((image_size, image_size)),
-            T.ToTensor(),
-        ])
+class ImageDataset(Dataset):
+    def __init__(
+        self,
+        root_image_dir: str | Path,
+        filename_label: str = "Filename",
+        transform: Callable | None = None,
+        caption_jsonl_path: str | Path | None = None,
+        caption_label: str | None = None,
+        caption_encoder: str | None = None,
+    ):
+        self.root_image_dir = Path(root_image_dir)
+        self.filename_label = filename_label
+        self.transform = transform
+        self.caption_jsonl_path = caption_jsonl_path
+        self.caption_label = caption_label
+        self.caption_encoder = caption_encoder
 
-    def __call__(self, batch):
-        texts = []
-        masks = []
-        images = []
-        for item in batch:
-            image_path = item[self.image_label]
-            try:
-                image = self.transform(Image.open(image_path).convert(self.channels))
-                images.append(image)
-            except Exception as e:
-                print(f"Failed to process image {image_path}: {e}")
-                continue
+        self.samples = []
+        if self.caption_jsonl_path is not None:
+            with open(self.caption_jsonl_path, "r") as f:
+                for line in f:
+                    self.samples.append(json.loads(line))
+        else:
+            for ext in IMG_EXTENSIONS:
+                files = glob.glob(str(self.root_image_dir / f"**/*{ext}"), recursive=True)
+                self.samples.extend([{self.filename_label: f} for f in files])
 
-            # Encode the text
-            text, mask = t5.t5_encode_text([item[self.text_label]], name=self.name, return_attn_mask=True)
-            texts.append(torch.squeeze(text))
-            masks.append(torch.squeeze(mask))
+    def __len__(self):
+        return len(self.samples)
 
-        if len(texts) == 0:
-            return None
+    def __getitem__(self, idx: int):
+        sample = self.samples[idx]
+        image = Image.open(self.root_image_dir / sample[self.filename_label])
+        if self.transform:
+            image = self.transform(image)
 
-        # TODO: Are these strictly necessary?
+        if self.caption_jsonl_path is not None:
+            caption = sample[self.caption_label]
+            caption_embed, caption_attn_mask = t5.t5_encode_text([caption], name=self.caption_encoder, return_attn_mask=True)
+            return image, caption_embed.squeeze(), caption_attn_mask.squeeze()
+        else:
+            return image
+
+
+class ImageCollator:
+    def __init__(self, use_caption: bool = False):
+        self.use_caption = use_caption
+
+    def __call__(self, batch_samples: List):
+        if not self.use_caption:
+            return default_collate(batch_samples)
+
+        images, texts, masks = zip(*batch_samples)
         texts = pad_sequence(texts, True)
         masks = pad_sequence(masks, True)
-
-        newbatch = []
-        for i in range(len(texts)):
-            newbatch.append((images[i], texts[i], masks[i]))
-
-        return torch.utils.data.dataloader.default_collate(newbatch)
+        batched_samples = list(zip(images, texts, masks))
+        return default_collate(batched_samples)
 
 
-class GlyffuserPipeline(DiffusionPipeline):
-    """
-    Pipeline for text-to-image generation from the glyffuser model
+def get_dataloader(
+    cfg: TrainingConfigBase,
+    root_image_dir: str | Path,
+    filename_label: str = "Filename",
+    caption_jsonl_path: str | Path | None = None,
+    caption_label: str | None = None,
+    caption_encoder: str | None = None,
+) -> DataLoader:
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((cfg.image_size, cfg.image_size)),
+        transforms.ToTensor(),
+    ])
 
-    Parameters:
-        unet (["UNet2DConditionModel"])
-        scheduler (["SchedulerMixin"])
-        text_encoder (["TextEncoder"]) - T5 small
-    """
-    def __init__(self, unet, scheduler):
-        super().__init__()
-        self.register_modules(unet=unet, scheduler=scheduler)
+    dataset = ImageDataset(
+        root_image_dir=root_image_dir,
+        filename_label=filename_label,
+        transform=transform,
+        caption_jsonl_path=caption_jsonl_path,
+        caption_label=caption_label,
+        caption_encoder=caption_encoder,
+    )
 
-    @torch.no_grad()
-    def __call__(
-        self,
-        texts: List[str],
-        text_encoder: str = "google-t5/t5-small",
-        batch_size: int = 1,
-        generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
-        num_inference_steps: int = 1000,
-        output_type: Optional[str] = "pil",
-        return_dict: bool = True,
-    ) -> Union[ImagePipelineOutput, Tuple]:
-        """
-        Docstring
-        """        
-        # Get text embeddings
-        # Encode the text
-        # text_embeddings = []
-        # for text in texts:
-        #     embedding = t5.t5_encode_text(text, name=text_encoder, device=self.device)
-        #     text_embeddings.append(torch.squeeze(embedding))
-        # text_embeddings = pad_sequence(text_embeddings, True)
-
-        batch_size = len(texts)
-
-        text_embeddings, masks = t5.t5_encode_text(texts, name=text_encoder, return_attn_mask=True, device=self.device)
-
-        # Sample gaussian noise to begin loop
-        if isinstance(self.unet.config.sample_size, int):
-            image_shape = (batch_size, self.unet.config.in_channels, self.unet.config.sample_size, self.unet.config.sample_size)
-        else:
-            image_shape = (batch_size, self.unet.config.in_channels, *self.unet.config.sample_size)
-
-        # if self.device.type == "mps": # MPS is apple silicon
-        #     # randn does not work reproducibly on mps
-        #     image = randn_tensor(image_shape, generator=generator)
-        #     image = image.to(self.device)
-        # else:
-        image = randn_tensor(image_shape, generator=generator, device=self.device)
-
-        # set step values
-        self.scheduler.set_timesteps(num_inference_steps)
-
-        for t in self.progress_bar(self.scheduler.timesteps):
-            # 1. predict noise model_output
-            model_output = self.unet(
-                image, 
-                t,
-                encoder_hidden_states=text_embeddings, # Add text encoding input
-                encoder_attention_mask=masks, # Add attention mask
-                return_dict=False
-            )[0] # <-- sample is an attribute of the BaseOutClass of type torch.FloatTensor
-
-            # 2. compute previous image: x_t -> x_t-1
-            image = self.scheduler.step(model_output, t, image, generator=generator, return_dict=False)[0]
-
-        # image = (image / 2 + 0.5).clamp(0, 1)
-        image = image.clamp(0, 1) # No need to rescale for HF yuewu/glyffuser
-        image = image.cpu().permute(0, 2, 3, 1).numpy()
-        if output_type == "pil":
-            image = self.numpy_to_pil(image)
-
-        if not return_dict:
-            return (image,)
-
-        return ImagePipelineOutput(images=image)
-
-
-def evaluate(config: TrainingConfig, epoch: int, texts: List[str], pipeline: GlyffuserPipeline):
-    images = pipeline(texts, batch_size=config.eval_batch_size).images
-    return make_grid(images, rows=4, cols=4)
-
-def make_grid(images: List, rows: int, cols: int):
-    w, h = images[0].size
-    grid = Image.new("RGB", size=(cols*w, rows*h), color=(255, 255, 255))
-    for i, image in enumerate(images):
-        grid.paste(image, box=(i%cols*w, i//cols*h))
-    return grid
-
-def make_labeled_grid(images: List, prompt: str, steps: int, font_path: str | None = None, font_size: int = 20, margin: int = 10):
-    assert len(images) == len(steps), "The number of images must match the number of steps"
-
-    w, h = images[0].size
-    font = ImageFont.truetype(font_path, font_size) if font_path else ImageFont.load_default()
-
-    # Calculate the height of the grid including the margin for text
-    total_height = h + margin + font_size
-    total_width = w * len(images)
-    grid_height = total_height + margin + font_size  # Add extra margin for the prompt
-    grid = Image.new("RGB", size=(total_width, grid_height), color=(255, 255, 255))
-
-    # Draw the text prompt at the top
-    draw = ImageDraw.Draw(grid)
-    prompt_text = f"Prompt: \"{prompt}\""
-    prompt_width, prompt_height = draw.textbbox((0, 0), prompt_text, font=font)[2:4]
-    prompt_x = (total_width - prompt_width) / 2
-    prompt_y = margin / 2
-    draw.text((prompt_x, prompt_y), prompt_text, fill="black", font=font)
-
-    for i, (image, step) in enumerate(zip(images, steps)):
-        # Calculate position to paste the image
-        x = i * w
-        y = margin + font_size
-
-        # Paste the image
-        grid.paste(image, box=(x, y))
-
-        # Draw the step text
-        step_text = f"Steps: {step}"
-        text_width, text_height = draw.textbbox((0, 0), step_text, font=font)[2:4]
-        text_x = x + (w - text_width) / 2
-        text_y = y + h + margin / 2 - 8
-        draw.text((text_x, text_y), step_text, fill="black", font=font)
-
-    return grid
+    return DataLoader(dataset, batch_size=cfg.train_batch_size, shuffle=True, collate_fn=ImageCollator(use_caption=caption_jsonl_path is not None))
