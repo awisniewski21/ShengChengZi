@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
@@ -45,8 +46,8 @@ def clean_definition(definition: str):
 
 def generate_and_save_character_images(
     df: pd.DataFrame,
-    font_path: str,
-    out_dir: str,
+    font_path: str | Path,
+    out_dir: str | Path,
     image_size: Tuple[int, int] = (128, 128),
     font_size: int = 100,
 ):
@@ -58,7 +59,7 @@ def generate_and_save_character_images(
 
     invalid_ixs = []
     for ix, row in tqdm(df.iterrows(), total=len(df)):
-        filename = os.path.join(out_dir, row["Filename"])
+        filename = Path(out_dir) / row["Filename"]
         if os.path.exists(filename):
             continue
 
@@ -68,6 +69,42 @@ def generate_and_save_character_images(
 
         img = create_image(row["Character"], font, image_size=image_size)
         img.save(filename)
+
+    return df.drop(index=invalid_ixs)
+
+
+def generate_and_save_paired_character_images(
+    df: pd.DataFrame,
+    font_path: str | Path,
+    out_dir: str | Path,
+    image_size: Tuple[int, int] = (128, 128),
+    font_size: int = 100,
+):
+    """
+    Generate and save images for each character specified in the DataFrame's column.
+    """
+    font = ImageFont.truetype(font_path, font_size)
+    os.makedirs(Path(out_dir) / "Simplified", exist_ok=True)
+    os.makedirs(Path(out_dir) / "Traditional", exist_ok=True)
+
+    invalid_ixs = []
+    for ix, row in tqdm(df.iterrows(), total=len(df)):
+        filename_s = Path(out_dir) / "Simplified" / row["Filename"]
+        filename_t = Path(out_dir) / "Traditional" / row["Filename"]
+        if os.path.exists(filename_s) or os.path.exists(filename_t):
+            assert os.path.exists(filename_s) and os.path.exists(filename_t)
+            continue
+
+        char_s = row["Character (S)"]
+        char_t = row["Character (T)"]
+        if not is_valid_char(char_s, font, image_size=image_size) or not is_valid_char(char_t, font, image_size=image_size):
+            invalid_ixs.append(ix)
+            continue
+
+        img_s = create_image(char_s, font, image_size=image_size)
+        img_t = create_image(char_t, font, image_size=image_size)
+        img_s.save(filename_s)
+        img_t.save(filename_t)
 
     return df.drop(index=invalid_ixs)
 

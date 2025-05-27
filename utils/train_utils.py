@@ -60,6 +60,41 @@ class ImageDataset(Dataset):
             return image
 
 
+class PairedImageDataset(Dataset):
+    def __init__(
+        self,
+        root_image_dir: str | Path,
+        transform: Callable | None = None,
+    ):
+        self.root_image_dir = Path(root_image_dir)
+        self.transform = transform
+
+        self.samples = []
+        for ext in IMG_EXTENSIONS:
+            files_s = sorted(glob.glob(str(self.root_image_dir / f"**/Simplified/*{ext}"), recursive=True))
+            files_t = sorted(glob.glob(str(self.root_image_dir / f"**/Traditional/*{ext}"), recursive=True))
+
+            assert len(files_s) == len(files_t), "Number of simplified and traditional images must match"
+
+            for f_s, f_t in zip(files_s, files_t):
+                assert Path(f_s).stem == Path(f_t).stem, f"Image names must match: {f_s} vs {f_t}"
+                self.samples.extend([{"src_file": f_t, "trg_file": f_s, "label": 0}]) # Traditional to Simplified (0)
+                self.samples.extend([{"src_file": f_s, "trg_file": f_t, "label": 1}]) # Simplified to Traditional (1)
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx: int):
+        sample = self.samples[idx]
+        img_src = Image.open(self.root_image_dir / sample["src_file"])
+        img_trg = Image.open(self.root_image_dir / sample["trg_file"])
+        if self.transform:
+            img_src = self.transform(img_src)
+            img_trg = self.transform(img_trg)
+
+        return img_src, img_trg, sample["label"]
+
+
 class ImageCollator:
     def __init__(self, use_caption: bool = False):
         self.use_caption = use_caption
@@ -99,3 +134,20 @@ def get_dataloader(
     )
 
     return DataLoader(dataset, batch_size=cfg.train_batch_size, shuffle=True, collate_fn=ImageCollator(use_caption=caption_jsonl_path is not None))
+
+def get_paired_dataloader(
+    cfg: TrainingConfigBase,
+    root_image_dir: str | Path,
+) -> DataLoader:
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((cfg.image_size, cfg.image_size)),
+        transforms.ToTensor(),
+    ])
+
+    dataset = PairedImageDataset(
+        root_image_dir=root_image_dir,
+        transform=transform,
+    )
+
+    return DataLoader(dataset, batch_size=cfg.train_batch_size, shuffle=True)
