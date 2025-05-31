@@ -17,13 +17,12 @@ from tqdm.auto import tqdm
 
 from core.utils.eval_utils import evalaute_char_to_image_grid
 from core.utils.repo_utils import get_repo_dir
-from core.utils.train_utils import get_paired_dataloader
-from shengchengzi.config.char2char_config import TrainingConfigChar2Char
-from shengchengzi.models.scz_c2c import Char2CharModel
+from core.dataset.datasets import get_dataloader
+from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
 
 
 def train_loop(
-    cfg: TrainingConfigChar2Char,
+    cfg: TrainingConfigChar2CharBi,
     train_dataloader: DataLoader,
     eval_dataloader: DataLoader,
     model: UNet2DModel,
@@ -37,7 +36,7 @@ def train_loop(
     # Tensorboard logging
     if cfg.output_dir is not None:
         os.makedirs(cfg.output_dir, exist_ok=True)
-    run_name = f"train_shengchengzi_char2char_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = f"train_shengchengzi_char2char_bi_orig_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     log_dir = str(Path(cfg.output_dir) / "logs" / run_name)
     writer = SummaryWriter(log_dir=log_dir)
 
@@ -91,17 +90,10 @@ def train_loop(
 
 
 def main():
-    # Try to mount Google Drive (for Colab compatibility)
-    try:
-        from google.colab import drive
-        drive.mount("/content/gdrive/")
-    except:
-        pass
+    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/datasets/paired_32x32")
+    METADATA_PATH = ROOT_IMAGE_DIR / "metadata.jsonl"
 
-    # Configuration
-    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/data_char2char")
-    
-    cfg = TrainingConfigChar2Char(
+    cfg = TrainingConfigChar2CharBi(
         image_size=32,
         train_batch_size=32,
         eval_batch_size=16,
@@ -111,10 +103,10 @@ def main():
     )
 
     # Data loaders
-    train_dataloader = get_paired_dataloader(cfg, ROOT_IMAGE_DIR)
-    eval_dataloader = DataLoader(train_dataloader.dataset, batch_size=cfg.eval_batch_size, shuffle=False)
+    train_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
+    eval_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH, batch_size=cfg.eval_batch_size, shuffle=False)
 
-    # Model - Using UNet2DModel instead of Char2CharModel as in the original notebook
+    # Model - Using UNet2DModel instead of Char2CharBiModel as in the original notebook
     model = UNet2DModel(    
         sample_size=cfg.image_size,
         in_channels=1,

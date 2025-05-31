@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
 from core.utils.repo_utils import get_repo_dir
-from core.utils.train_utils import get_dataloader
+from core.dataset.datasets import get_dataloader
 from glyffuser.config.rand2char_config import TrainingConfigRand2Char
 from glyffuser.utils.eval_utils import DiffusionPipelineRand2Char
 
@@ -85,16 +85,9 @@ def train_loop(
 
 
 def main():
-    # Try to mount Google Drive (for Colab compatibility)
-    try:
-        from google.colab import drive
-        drive.mount("/content/gdrive/")
-    except:
-        pass
+    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/datasets/unpaired_32x32")
+    METADATA_PATH = ROOT_IMAGE_DIR / "metadata.jsonl"
 
-    # Configuration
-    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/data")
-    
     cfg = TrainingConfigRand2Char(
         image_size=32,
         train_batch_size=32,
@@ -105,7 +98,7 @@ def main():
     )
 
     # Data loader
-    train_dataloader = get_dataloader(cfg, ROOT_IMAGE_DIR)
+    train_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
 
     # Model
     model = UNet2DModel(

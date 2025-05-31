@@ -15,18 +15,18 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
-from core.utils.eval_utils import DiffusionPipelineChar2Char
+from core.utils.eval_utils import DiffusionPipelineChar2CharBi
 from core.utils.repo_utils import get_repo_dir
-from core.utils.train_utils import get_paired_dataloader
-from shengchengzi.config.char2char_config import TrainingConfigChar2Char
-from shengchengzi.models.scz_c2c import Char2CharModel
+from core.dataset.datasets import get_dataloader
+from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
+from shengchengzi.models.scz_c2c_bi import Char2CharBiModel
 
 
 def train_loop(
-    cfg: TrainingConfigChar2Char,
+    cfg: TrainingConfigChar2CharBi,
     train_dataloader: DataLoader,
     eval_dataloader: DataLoader,
-    model: Char2CharModel,
+    model: Char2CharBiModel,
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     noise_scheduler: DDPMScheduler,
@@ -37,7 +37,7 @@ def train_loop(
     # Tensorboard logging
     if cfg.output_dir is not None:
         os.makedirs(cfg.output_dir, exist_ok=True)
-    run_name = f"train_shengchengzi_char2char_new_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = f"train_shengchengzi_char2char_bi_new_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     log_dir = str(Path(cfg.output_dir) / "logs" / run_name)
     writer = SummaryWriter(log_dir=log_dir)
 
@@ -81,7 +81,7 @@ def train_loop(
             global_step += 1
 
         model.eval()
-        pipeline = DiffusionPipelineChar2Char(model, noise_scheduler)
+        pipeline = DiffusionPipelineChar2CharBi(model, noise_scheduler)
         pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
         # Save model checkpoint
@@ -103,17 +103,10 @@ def train_loop(
 
 
 def main():
-    # Try to mount Google Drive (for Colab compatibility)
-    try:
-        from google.colab import drive
-        drive.mount("/content/gdrive/")
-    except:
-        pass
+    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/datasets/paired_32x32")
+    METADATA_PATH = ROOT_IMAGE_DIR / "metadata.jsonl"
 
-    # Configuration
-    ROOT_IMAGE_DIR = get_repo_dir() / Path("data/data_char2char")
-    
-    cfg = TrainingConfigChar2Char(
+    cfg = TrainingConfigChar2CharBi(
         image_size=32,
         train_batch_size=32,
         eval_batch_size=16,
@@ -123,11 +116,11 @@ def main():
     )
 
     # Data loaders
-    train_dataloader = get_paired_dataloader(cfg, ROOT_IMAGE_DIR)
-    eval_dataloader = DataLoader(train_dataloader.dataset, batch_size=cfg.eval_batch_size, shuffle=False)
+    train_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
+    eval_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH, batch_size=cfg.eval_batch_size, shuffle=False)
 
     # Model
-    model = Char2CharModel(cfg)
+    model = Char2CharBiModel(cfg)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total Model Parameters: {total_params:,}")
 

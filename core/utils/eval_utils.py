@@ -8,17 +8,17 @@ from diffusers.utils.torch_utils import randn_tensor
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
-from shengchengzi.models.scz_c2c import Char2CharModel
+from shengchengzi.models.scz_c2c_bi import Char2CharBiModel
 
 
-class DiffusionPipelineChar2Char(DiffusionPipeline):
+class DiffusionPipelineChar2CharBi(DiffusionPipeline):
     """
     Pipeline for text-to-image generation
     """
-    model: Char2CharModel
+    model: Char2CharBiModel
     scheduler: DPMSolverMultistepScheduler
 
-    def __init__(self, model: Char2CharModel, scheduler: DDPMScheduler):
+    def __init__(self, model: Char2CharBiModel, scheduler: DDPMScheduler):
         super().__init__()
         self.register_modules(model=model, scheduler=scheduler)
 

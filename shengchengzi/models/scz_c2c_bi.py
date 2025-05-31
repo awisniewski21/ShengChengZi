@@ -1,11 +1,11 @@
 import torch
 from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 
-from shengchengzi.config.char2char_config import TrainingConfigChar2Char
+from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
 
 
-class Char2CharModel(torch.nn.Module):
-    def __init__(self, cfg: TrainingConfigChar2Char):
+class Char2CharBiModel(torch.nn.Module):
+    def __init__(self, cfg: TrainingConfigChar2CharBi):
         super().__init__()
         self.cfg = cfg
 

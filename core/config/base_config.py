@@ -7,6 +7,7 @@ from core.utils.repo_utils import get_repo_dir
 @dataclass
 class TrainingConfigBase:
     """ Dataset """
+    task_name: str                              # Task name ("rand2char", "text2char", "char2char", or "char2char_bi")
     image_size: int = 128                       # Image resolution
 
     """ Training Params """
