@@ -1,4 +1,4 @@
-# 生成字 (ShēngChéng Zì)
+# 生成字 (ShēngChéngZì)
 
 | EN | Generative AI for Chinese Characters |
 | --- | --- |
@@ -8,12 +8,16 @@
 
 ## Overview
 
-生成字 (ShēngChéng Zì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
+生成字 (ShēngChéngZì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
 
-- **Text-to-Image Generation**
-  - Generate a Chinese character based on a text prompt (see `glyffuser`'s rand2char/text2char models)
-- **Image-to-Image Translation**
-  - Generate a simplified or traditional variant of a given Chinese character (see `palette`'s char2char models)
+- **Random-to-Character (R2C)**  
+For a given random latent vector, generate an image of a Chinese character.
+
+- **Text-to-Character (T2C)**  
+For a given text prompt, generate an image of a Chinese character.
+
+- **Character-to-Character (C2C)**  
+For a given Chinese character, generate an image of its simplified or traditional variant.
 
 ---
 
@@ -31,27 +35,33 @@
     pip install -r requirements.txt
     ```
 
-3. Generate the dataset(s) of Chinese characters using [`notebooks/generate_datasets.ipynb`](notebooks/generate_datasets.ipynb)
-4. Train models using the Python runner scripts in the `runners/` directory
-5. (WIP) Run inference on the model(s)
+3. Generate the dataset(s) of Chinese characters using the notebooks in [`core/dataset`](core/dataset)
+4. Train models using the Python scripts in the repository root (see below)
+5. (WIP) Run inference on the models
 
 ---
 
 ## Training
 
-The `runners/` directory contains Python scripts for training different models, converted from Jupyter notebooks for streamlined execution. All scripts should be run from the repository root:
+The repository root contains Python scripts for training different models on various tasks.
 
 ### Available Models
-- **Palette (char2char)**: `python runners/run_palette.py -c palette/config/char2char.json -p train`
-- **Character-to-Character**: `python runners/run_char2char.py`
-- **Character-to-Character (New)**: `python runners/run_char2char_new.py`
-- **Random-to-Character**: `python runners/run_rand2char.py`
-- **Text-to-Character**: `python runners/run_text2char.py`
 
-All models output TensorBoard logs, checkpoints, and evaluation images to their respective output directories.
+- **Glyffuser**
+  - Random-to-Character: `python train_glyffuser_r2c.py`
+  - Text-to-Character: `python train_glyffuser_t2c.py`
+- **Palette**
+  - Character-to-Character: `python train_palette_c2c.py`
+- **ShengChengZi**
+  - Character-to-Character: `python train_scz_c2c.py`
+  - Character-to-Character (New): `python train_scz_c2c_new.py`
+
+All models output TensorBoard logs, checkpoints, and evaluation images to their respective output directories in `out/`.
 
 ---
 
 ## Acknowledgements
 
-Portions of the source code are based upon the [glyffuser repo](https://github.com/yue-here/glyffuser/tree/main) and [corresponding article](https://yue-here.com/posts/glyffuser/).
+The `glyffuser` model and code is based upon the [article](https://yue-here.com/posts/glyffuser/) and [repo](https://github.com/yue-here/glyffuser/tree/main) by Yue Wu.
+
+The `palette` model and code is based upon the [paper](https://doi.org/10.1145/3528233.353075) and [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Chitwan Saharia et al.
