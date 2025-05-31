@@ -192,5 +192,5 @@ cython_debug/
 
 
 # Project specific
-data/data*
+data/*data*
 out
