@@ -11,9 +11,9 @@
 生成字 (ShēngChéng Zì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
 
 - **Text-to-Image Generation**
-  - [ ] (WIP) Generate a Chinese character based on a text prompt
+  - Generate a Chinese character based on a text prompt (see `glyffuser`'s rand2char/text2char models)
 - **Image-to-Image Translation**
-  - [ ] (WIP) Generate a simplified or traditional variant of a given Chinese character
+  - Generate a simplified or traditional variant of a given Chinese character (see `palette`'s char2char models)
 
 ---
 
@@ -32,8 +32,23 @@
     ```
 
 3. Generate the dataset(s) of Chinese characters using [`notebooks/generate_datasets.ipynb`](notebooks/generate_datasets.ipynb)
-4. (WIP) Train the model(s) using `notebooks/train_*_model.ipynb`
-5. (WIP) Run inference on the model(s) using `notebooks/evaluate_*_model.ipynb`
+4. Train models using the Python runner scripts in the `runners/` directory
+5. (WIP) Run inference on the model(s)
+
+---
+
+## Training
+
+The `runners/` directory contains Python scripts for training different models, converted from Jupyter notebooks for streamlined execution. All scripts should be run from the repository root:
+
+### Available Models
+- **Palette (char2char)**: `python runners/run_palette.py -c palette/config/char2char.json -p train`
+- **Character-to-Character**: `python runners/run_char2char.py`
+- **Character-to-Character (New)**: `python runners/run_char2char_new.py`
+- **Random-to-Character**: `python runners/run_rand2char.py`
+- **Text-to-Character**: `python runners/run_text2char.py`
+
+All models output TensorBoard logs, checkpoints, and evaluation images to their respective output directories.
 
 ---
 

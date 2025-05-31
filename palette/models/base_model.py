@@ -6,11 +6,11 @@ from typing import Callable, Dict, List
 
 import torch
 import torch.nn as nn
-from core.logger import InfoLogger, MetricsLogger
-from core.utils import set_device
 from torch.utils.data import DataLoader
 
-from models.base_network import BaseNetwork
+from palette.models.base_network import BaseNetwork
+from palette.utils.device_utils import set_device
+from palette.utils.logger import InfoLogger, MetricsLogger
 
 CustomResult = namedtuple("CustomResult", "name result")
 
@@ -106,7 +106,7 @@ class BaseModel:
         if self.opt["global_rank"] != 0:
             return
         save_filename = f"{self.epoch}_{network_label}.pth"
-        save_path = os.path.join(self.opt["path"]["checkpoint"], save_filename)
+        save_path = os.path.join(self.opt["path"]["base_dir"], self.opt["path"]["model_dir"], self.opt["name"], save_filename)
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         state_dict = network.state_dict()

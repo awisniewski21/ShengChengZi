@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from models.base_network import BaseNetwork
-from models.utils import default, extract, make_beta_schedule  # NOQA
+from palette.models.base_network import BaseNetwork
+from palette.models.utils import default, extract, make_beta_schedule  # NOQA
 
 
 class PaletteNetwork(BaseNetwork):

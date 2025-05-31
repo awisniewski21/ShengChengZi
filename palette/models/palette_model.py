@@ -1,14 +1,13 @@
 import copy
-from typing import List, Callable
+from typing import Callable, List
 
 import torch
 from tqdm import tqdm
-from core.logger import MetricsTracker
 
-from models.base_model import BaseModel
-from models.utils import EMA
-from models.palette_network import PaletteNetwork
-from models.utils import EMA
+from palette.models.base_model import BaseModel
+from palette.models.palette_network import PaletteNetwork
+from palette.models.utils import EMA
+from palette.utils.logger import MetricsTracker
 
 
 class PaletteModel(BaseModel):
