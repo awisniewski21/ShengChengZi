@@ -8,25 +8,24 @@ from core.utils.repo_utils import get_repo_dir
 class TrainConfigBase:
     """ Dataset """
     task_name: str                              # Task name ("rand2char", "text2char", "char2char", or "char2char_bi")
-    image_size: int = 128                       # Image resolution
-    
+    image_size: int = 64                        # Image resolution
+
     """ Dataset Split """
-    validation_split: float | int = 0.2         # Validation split (0.0-1.0 for percentage, or int for absolute count)
-    test_split: float | int = 0.1               # Test split (0.0-1.0 for percentage, or int for absolute count)
-    shuffle_dataset: bool = True                # Shuffle dataset before splitting
+    validation_split: float | int = 0.05        # Validation split (0.0-1.0 or int for absolute count)
+    test_split: float | int = 0.05              # Test split (0.0-1.0 or int for absolute count)
 
     """ Training Params """
     num_epochs: int = 100                       # Training epochs
     train_batch_size: int = 16                  # Training batch size (number of images)
     eval_batch_size: int = 16                   # Evaluation batch size (number of images)
     learning_rate: float = 1e-4                 # Model learning rate
-    lr_warmup_steps: int = 500                  # Gradually increase lr to full value over first N steps
     seed: int = 0                               # Seed for random number generators
 
     """ Logging """
     output_dir: str = "out"                     # Output directory
-    save_image_epochs: int = 10                 # Save training images every N epochs
-    save_model_epochs: int = 30                 # Save model checkpoints every N epochs
+    log_step_interval: int = 1                  # Log metrics every N steps
+    eval_epoch_interval: int = 10               # Run validation every N epochs
+    checkpoint_epoch_interval: int = 30         # Save model checkpoints every N epochs
 
     def __post_init__(self):
         self.output_dir = str(Path(get_repo_dir()) / self.output_dir)

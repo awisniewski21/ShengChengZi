@@ -1,207 +1,132 @@
-#!/usr/bin/env python3
-"""
-Text-to-Character (T2C) Glyffuser model trainer.
-"""
+from typing import Dict, List, Tuple
 
 import torch
-from pathlib import Path
-from typing import Any, Dict
+from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DConditionModel  # NOQA
+from diffusers.pipelines.pipeline_utils import ImagePipelineOutput  # NOQA
+from diffusers.utils.torch_utils import randn_tensor
 
-from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, UNet2DConditionModel
-from core.models.base_model import TrainModelBase
-from core.utils.eval_utils import DiffusionPipeline_T2C_Glyff
-from configs.t2c_glyffuser import TrainConfig_T2C_Glyff
+from configs import TrainConfig_T2C_Glyff
+from core.models import TrainModelBase
+from core.utils.image_utils import make_image_grid, to_out_img
 
 
 class TrainModel_T2C_Glyffuser(TrainModelBase):
     """
-    Text-to-Character Glyffuser model trainer.
+    Glyffuser model for Text-to-Character (T2C) training
     """
-    
-    def __init__(
-        self,
-        config: TrainConfig_T2C_Glyff,
-        train_dataloader,
-        val_dataloader,
-        test_dataloader,
-        model: UNet2DConditionModel,
-        optimizer: torch.optim.Optimizer,
-        lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
-        noise_scheduler: DDPMScheduler,
-        inference_scheduler: DPMSolverMultistepScheduler,
-        **kwargs
-    ):
-        """
-        Initialize the Glyffuser T2C model trainer.
-        
-        Args:
-            noise_scheduler: Scheduler for adding noise during training
-            inference_scheduler: Scheduler for inference/sampling
-        """
-        super().__init__(
-            config=config,
-            train_dataloader=train_dataloader,
-            val_dataloader=val_dataloader,
-            test_dataloader=test_dataloader,
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            task_prefix="train_glyffuser_t2c",
-            **kwargs
-        )
-        
+    config: TrainConfig_T2C_Glyff
+    net: UNet2DConditionModel
+
+    def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DPMSolverMultistepScheduler, **kwargs):
+        super().__init__(task_prefix="train_t2c_glyffuser", **kwargs)
+
         self.noise_scheduler = noise_scheduler
         self.inference_scheduler = inference_scheduler
 
-    def train_step(self, batch_data: Any) -> float:
-        """
-        Perform a single training step for T2C diffusion model.
-        
-        Args:
-            batch_data: Tuple of (images, text_embeddings, masks)
-            
-        Returns:
-            Loss value for this step
-        """
-        b_imgs, b_texts_embed, b_masks = batch_data
-        b_imgs = b_imgs.to(self.device)
-        b_texts_embed = b_texts_embed.to(self.device)
-        b_masks = b_masks.to(self.device)
-        
-        # Sample noise and timesteps
-        noise = torch.randn_like(b_imgs)
-        timesteps = torch.randint(
-            0, self.noise_scheduler.config.num_train_timesteps, (b_imgs.shape[0],), device=self.device
-        ).long()
-        
-        # Add noise to images
-        noisy_images = self.noise_scheduler.add_noise(b_imgs, noise, timesteps)
-        
-        # Predict noise with text conditioning
-        noise_pred = self.model(
-            noisy_images, 
-            timesteps, 
-            encoder_hidden_states=b_texts_embed,
-            return_dict=False
-        )[0]
-        
-        # Calculate loss
-        loss = torch.nn.functional.mse_loss(noise_pred, noise)
-        
-        # Backward pass
+    def train_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[str]]) -> float:
+        trg_imgs, src_texts_embed, _, _ = batch_data
+        trg_imgs = trg_imgs.to(self.device)
+        src_texts_embed = src_texts_embed.to(self.device)
+        bs = trg_imgs.shape[0]
+
+        noise = torch.randn_like(trg_imgs)
+        timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=self.device).long()
+        trg_imgs_noisy = self.noise_scheduler.add_noise(trg_imgs, noise, timesteps)
+
+        pred_noise = self.net(trg_imgs_noisy, timesteps, encoder_hidden_states=src_texts_embed).sample
+
+        train_loss = torch.nn.functional.mse_loss(pred_noise, noise)
+
         self.optimizer.zero_grad()
-        loss.backward()
+        train_loss.backward()
         self.optimizer.step()
-        self.lr_scheduler.step()
-        
-        return loss.item()
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
 
-    def validation_step(self, batch_data: Any) -> float:
-        """
-        Perform a single validation step.
-        
-        Args:
-            batch_data: Tuple of (images, text_embeddings, masks)
-            
-        Returns:
-            Loss value for this step
-        """
-        b_imgs, b_texts_embed, b_masks = batch_data
-        b_imgs = b_imgs.to(self.device)
-        b_texts_embed = b_texts_embed.to(self.device)
-        b_masks = b_masks.to(self.device)
-        
-        # Sample noise and timesteps
-        noise = torch.randn_like(b_imgs)
-        timesteps = torch.randint(
-            0, self.noise_scheduler.config.num_train_timesteps, (b_imgs.shape[0],), device=self.device
-        ).long()
-        
-        # Add noise to images
-        noisy_images = self.noise_scheduler.add_noise(b_imgs, noise, timesteps)
-        
-        # Predict noise with text conditioning
-        noise_pred = self.model(
-            noisy_images, 
-            timesteps, 
-            encoder_hidden_states=b_texts_embed,
-            return_dict=False
-        )[0]
-        
-        # Calculate loss
-        loss = torch.nn.functional.mse_loss(noise_pred, noise)
-        
-        return loss.item()
+        return train_loss.item()
 
-    def save_sample_images(self, epoch: int):
-        """
-        Generate and save sample images using the diffusion pipeline.
-        
-        Args:
-            epoch: Current epoch number
-        """
-        try:
-            # Create diffusion pipeline
-            pipeline = DiffusionPipeline_T2C_Glyff(
-                unet=self.model,
-                scheduler=self.inference_scheduler
-            )
-            
-            # Sample text prompts (this would ideally come from validation set)
-            sample_prompts = ["简体字", "繁体字", "汉字", "中文"]
-            
-            # Generate sample images
-            sample_images = pipeline(
-                prompt=sample_prompts,
-                generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-                num_inference_steps=50,
-            ).images
-            
-            # Save images
-            sample_dir = Path(self.log_dir) / "samples"
-            sample_dir.mkdir(exist_ok=True)
-            
-            for i, (img, prompt) in enumerate(zip(sample_images, sample_prompts)):
-                img_path = sample_dir / f"epoch_{epoch:03d}_sample_{i}_{prompt}.png"
-                img.save(img_path)
-            
-            print(f"Saved {len(sample_images)} sample images to {sample_dir}")
-            
-        except Exception as e:
-            print(f"Failed to generate sample images: {e}")
+    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[str]], phase: str, log_images: bool) -> float:
+        eval_pipeline = DiffusionPipeline_T2C_Glyff(unet=self.net, scheduler=self.inference_scheduler)
+        eval_pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
-    def get_model_specific_checkpoint_data(self) -> Dict[str, Any]:
-        """
-        Get model-specific checkpoint data.
-        
-        Returns:
-            Dictionary containing scheduler states
-        """
-        return {
-            "noise_scheduler_state": self.noise_scheduler.state_dict(),
-            "inference_scheduler_state": self.inference_scheduler.state_dict(),
-        }
+        trg_imgs, src_texts_embed, src_texts_mask, src_texts_raw = batch_data
+        trg_imgs = trg_imgs.to(self.device)
+        src_texts_embed = src_texts_embed.to(self.device)
+        src_texts_mask = src_texts_mask.to(self.device)
 
-    def load_model_specific_checkpoint_data(self, checkpoint: Dict[str, Any]):
-        """
-        Load model-specific checkpoint data.
-        
-        Args:
-            checkpoint: Loaded checkpoint dictionary
-        """
-        if "noise_scheduler_state" in checkpoint:
-            self.noise_scheduler.load_state_dict(checkpoint["noise_scheduler_state"])
-        if "inference_scheduler_state" in checkpoint:
-            self.inference_scheduler.load_state_dict(checkpoint["inference_scheduler_state"])
+        pred_imgs = eval_pipeline(
+            src_texts_embed,
+            src_texts_mask,
+            batch_size=self.config.eval_batch_size,
+            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
+            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            output_type="numpy",
+        ).images
 
-    def get_evaluation_kwargs(self) -> Dict[str, Any]:
-        """
-        Get evaluation kwargs specific to T2C model.
-        
-        Returns:
-            Dictionary of evaluation parameters
-        """
-        return {
-            "noise_scheduler": self.noise_scheduler,
-            "inference_scheduler": self.inference_scheduler,
-        }
+        eval_loss = torch.nn.functional.mse_loss(pred_imgs, trg_imgs)
+
+        if log_images:
+            trg_imgs_out = to_out_img(trg_imgs, (0, 1))
+            pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+            grid_img = make_image_grid([pred_imgs_out, trg_imgs_out])
+            self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
+            self.writer.add_text(f"{phase}/image_captions", str(dict(enumerate(src_texts_raw))), self.current_epoch)
+
+        return eval_loss.item()
+
+    def get_checkpoint_data(self) -> Dict:
+        chkpt_data = super().get_checkpoint_data()
+        chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()
+        chkpt_data["inference_scheduler_state"] = self.inference_scheduler.state_dict()
+        return chkpt_data
+
+    def load_checkpoint_data(self, chkpt_data: Dict):
+        super().load_checkpoint_data(chkpt_data)
+        self.noise_scheduler.load_state_dict(chkpt_data["noise_scheduler_state"])
+        self.inference_scheduler.load_state_dict(chkpt_data["inference_scheduler_state"])
+
+
+class DiffusionPipeline_T2C_Glyff(DDPMPipeline):
+    """
+    Inference diffusion pipeline for text-to-image generation
+    """
+    unet: UNet2DConditionModel
+    scheduler: DPMSolverMultistepScheduler
+
+    @torch.no_grad()
+    def __call__(
+        self,
+        texts_embed: torch.Tensor,
+        texts_mask: torch.Tensor,
+        batch_size: int = 1,
+        generator: torch.Generator | List[torch.Generator] | None = None,
+        num_inference_steps: int = 1000,
+        output_type: str | None = "pil",
+        return_dict: bool = True,
+    ) -> ImagePipelineOutput | Tuple:
+        if isinstance(self.unet.config.sample_size, int):
+            image_shape = (batch_size, self.unet.config.in_channels, self.unet.config.sample_size, self.unet.config.sample_size)
+        else:
+            image_shape = (batch_size, self.unet.config.in_channels, *self.unet.config.sample_size)
+
+        if self.device.type == "mps":
+            image = randn_tensor(image_shape, generator=generator, dtype=self.unet.dtype)
+            image = image.to(self.device)
+        else:
+            image = randn_tensor(image_shape, generator=generator, device=self.device, dtype=self.unet.dtype)
+
+        self.scheduler.set_timesteps(num_inference_steps)
+
+        for t in self.progress_bar(self.scheduler.timesteps):
+            model_output = self.unet(image, t, encoder_hidden_states=texts_embed, encoder_attention_mask=texts_mask).sample
+            image = self.scheduler.step(model_output, t, image, generator=generator).prev_sample
+
+        image = (image / 2 + 0.5).clamp(0, 1)
+        image = image.cpu().permute(0, 2, 3, 1).numpy()
+        if output_type == "pil":
+            image = self.numpy_to_pil(image)
+
+        if not return_dict:
+            return (image,)
+
+        return ImagePipelineOutput(images=image)

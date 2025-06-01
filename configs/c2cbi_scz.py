@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 
-from configs.base_config import TrainConfigBase
+from configs import TrainConfigBase
 
 
 @dataclass
 class TrainConfig_C2CBi_SCZ(TrainConfigBase):
     """ Model Params """
     task_name: str = "char2char_bi"             # Task name
-    encoder_dim: int = 1024                     # Encoder dimensions
     
-    """ Training Params (moved from base) """
+    """ Training Params """
     lr_warmup_steps: int = 500                  # Gradually increase lr to full value over first N steps

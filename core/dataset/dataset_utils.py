@@ -1,12 +1,16 @@
-import os
-import re
 import glob
+import os
+import random
+import re
 from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
+from torch.utils.data import Dataset, Subset
 from tqdm import tqdm
+
+from configs import TrainConfigBase
 
 
 def load_unihan_data(unihan_dir: Path) -> pd.DataFrame:
@@ -108,6 +112,43 @@ def gen_char_images(
     out_df = out_df[sorted(c for c in out_df.columns if not c.startswith("k"))]
 
     return out_df
+
+
+def split_dataset(dataset: Dataset, cfg: TrainConfigBase) -> Tuple[Dataset, Dataset, Dataset]:
+    """
+    Split a dataset into train, validation, and test sets
+    """
+    dataset_size = len(dataset)
+    all_indices = list(range(dataset_size))
+
+    random.seed(cfg.seed)
+    random.shuffle(all_indices)
+
+    if isinstance(cfg.validation_split, float):
+        assert 0.0 <= cfg.validation_split <= 1.0, "validation_split must be [0.0, 1.0] or [0, dataset_size]"
+        val_size = int(cfg.validation_split * dataset_size)
+    else:
+        assert 0 <= cfg.validation_split < dataset_size, "validation_split must be [0.0, 1.0] or [0, dataset_size]"
+        val_size = cfg.validation_split
+
+    if isinstance(cfg.test_split, float):
+        assert 0.0 <= cfg.test_split <= 1.0, "test_split must be [0.0, 1.0] or [0, dataset_size]"
+        test_size = int(cfg.test_split * dataset_size)
+    else:
+        assert 0 <= cfg.test_split < dataset_size, "test_split must be [0.0, 1.0] or [0, dataset_size]"
+        test_size = cfg.test_split
+
+    assert val_size + test_size < dataset_size, "Validation and test splits must be less than dataset size"
+
+    test_indices = all_indices[:test_size] if test_size > 0 else []
+    val_indices = all_indices[test_size:test_size + val_size] if val_size > 0 else []
+    train_indices = all_indices[test_size + val_size:]
+
+    train_dataset = Subset(dataset, train_indices)
+    val_dataset = Subset(dataset, val_indices) if val_size > 0 else None
+    test_dataset = Subset(dataset, test_indices) if test_size > 0 else None
+
+    return train_dataset, val_dataset, test_dataset
 
 
 ###
