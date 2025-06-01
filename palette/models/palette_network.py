@@ -7,27 +7,57 @@ from tqdm import tqdm
 
 from palette.models.base_network import BaseNetwork
 from palette.models.utils import default, extract, make_beta_schedule  # NOQA
+from configs.c2c_palette import TrainConfig_C2C_Palette
 
 
 class PaletteNetwork(BaseNetwork):
-    def __init__(self, unet_kwargs: Dict, beta_schedule_kwargs: Dict, module_name: str = "sr3", **kwargs):
+    def __init__(self, config: TrainConfig_C2C_Palette, **kwargs):
         super(PaletteNetwork, self).__init__(**kwargs)
-        if module_name == "sr3":
+        
+        # Store config for later use
+        self.config = config
+        
+        # Select UNet module based on config
+        if config.module_name == "sr3":
             from .sr3_modules.unet import UNet
-        elif module_name == "guided_diffusion":
+            # Create UNet with SR3 parameters
+            self.denoise_fn = UNet(
+                in_channel=config.in_channel,
+                out_channel=config.out_channel,
+                inner_channel=config.inner_channel,
+                channel_mults=tuple(config.channel_mults),
+                attn_res=tuple(config.attn_res),
+                res_blocks=config.res_blocks,
+                dropout=config.dropout,
+                image_size=config.image_size
+            )
+        elif config.module_name == "guided_diffusion":
             from .guided_diffusion_modules.unet import UNet
+            # Create UNet with Guided Diffusion parameters
+            self.denoise_fn = UNet(
+                image_size=config.image_size,
+                in_channel=config.in_channel,
+                inner_channel=config.inner_channel,
+                out_channel=config.out_channel,
+                res_blocks=config.res_blocks,
+                attn_res=tuple(config.attn_res),
+                dropout=config.dropout,
+                channel_mults=tuple(config.channel_mults),
+                num_head_channels=config.num_head_channels,
+                use_checkpoint=False,
+                use_scale_shift_norm=True,
+                resblock_updown=True,
+                use_new_attention_order=False,
+            )
         else:
-            raise NotImplementedError(f"Module '{module_name}' is not implemented")
-
-        self.denoise_fn = UNet(**unet_kwargs)
-        self.beta_schedule = beta_schedule_kwargs
+            raise NotImplementedError(f"Module '{config.module_name}' is not implemented")
 
     def set_loss(self, loss_fn: Callable):
         self.loss_fn = loss_fn
 
-    def set_new_noise_schedule(self, device: torch.device = torch.device("cpu"), phase: str = "train"):
+    def set_new_noise_schedule(self, device: torch.device, phase: str):
         to_torch = partial(torch.tensor, dtype=torch.float32, device=device)
-        betas = make_beta_schedule(**self.beta_schedule[phase])
+        betas = make_beta_schedule(config=self.config, phase=phase)
         betas = betas.detach().cpu().numpy() if isinstance(betas, torch.Tensor) else betas
         alphas = 1.0 - betas
 
@@ -105,7 +135,8 @@ class PaletteNetwork(BaseNetwork):
     def forward(self, y_0, y_cond=None, mask=None, noise=None):
         # Sample from p(gammas)
         b, *_ = y_0.shape
-        t = torch.randint(1, self.num_timesteps, (b,), device=y_0.device).long()
+        t = torch.randint(1, self.num_timesteps, (b,)).long()
+        t = t.to(y_0.device)
         gamma_t1 = extract(self.gammas, t - 1, x_shape=(1, 1))
         sqrt_gamma_t2 = extract(self.gammas, t, x_shape=(1, 1))
         sample_gammas = (sqrt_gamma_t2 - gamma_t1) * torch.rand((b, 1), device=y_0.device) + gamma_t1

@@ -11,8 +11,8 @@ class TrainConfig_C2C_Palette(TrainConfigBase):
 
     """ Dataset """
     task_name: str = "char2char"                # Task name
-    root_image_dir: str = "data/datasets/paired_64x64"
-    validation_split: int = 2                   # Validation split size
+    root_image_dir: str = "data/datasets/paired_32x32"
+    validation_split: float = 0.05             # Validation split size
 
     """ Training Params """
     name: str = "palette_char2char"             # Experiment name
@@ -74,6 +74,5 @@ class TrainConfig_C2C_Palette(TrainConfigBase):
     def __post_init__(self):
         super().__post_init__()
 
-        self.root_image_dir = str(Path(self.output_dir) / self.root_image_dir)
         self.log_dir = str(Path(self.output_dir) / self.log_dir)
         self.model_dir = str(Path(self.output_dir) / self.model_dir)

@@ -28,13 +28,16 @@ def setup_training_environment(cfg: TrainConfigBase, task_prefix: str) -> Tuple[
     Returns:
         Tuple of (device, run_name, log_dir, writer)
     """
-    # Get best available device
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
+    # Get best available device - temporarily force CPU
+    device = torch.device("cpu")
+    
+    # Original device selection (commented out due to MPS issues)
+    # if torch.cuda.is_available():
+    #     device = torch.device("cuda")
+    # elif torch.backends.mps.is_available():
+    #     device = torch.device("mps")
+    # else:
+    #     device = torch.device("cpu")
     
     # Create output directory
     if cfg.output_dir is not None:

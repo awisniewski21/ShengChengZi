@@ -1,99 +1,113 @@
 #!/usr/bin/env python3
 """
-Palette model runner script.
+Palette model training runner using the merged Palette model.
 """
 
 import os
 import warnings
+from pathlib import Path
 
 import click
 import torch
 import torch.multiprocessing as mp
 
 from palette.utils.device_utils import set_seed
-from palette.utils.load_modules import define_dataloader, define_model  # NOQA
-from palette.utils.logger import InfoLogger, MetricsLogger
 from palette.utils.parser import parse_dataclass_args
 from configs.c2c_palette import TrainConfig_C2C_Palette
+from core.models import TrainModel_C2C_Palette
+from core.dataset.datasets import get_dataloaders
 
 
 def main_worker(gpu: int, ngpus_per_node: int, config: TrainConfig_C2C_Palette):
     """
-    Main function to run on each thread / GPU
+    Main function to run on each thread / GPU using the merged Palette model.
     """
     if config.local_rank is None:
         config.local_rank = config.global_rank = gpu
 
-    if config.distributed:
-        torch.cuda.set_device(int(config.local_rank))
-        print(f"Using GPU {int(config.local_rank)} for training")
-        torch.distributed.init_process_group(
-            backend="nccl",
-            init_method=config.init_method,
-            world_size=config.world_size,
-            rank=config.global_rank,
-            group_name="mtorch",
-        )
-
-    torch.backends.cudnn.enabled = True
-    warnings.warn("Using cuDNN for acceleration (torch.backends.cudnn.enabled=True)")
-    set_seed(config.seed)
-
-    logger = InfoLogger(config)
-    writer = MetricsLogger(config, logger)
-    logger.info(f"Created log file at '{writer.log_dir}'")
-
-    phase_loader, val_loader = define_dataloader(config, logger)
-
-    model = define_model(
-        config,
-        logger,
-        phase_loader=phase_loader,
-        val_loader=val_loader,
-        writer=writer
+    print(f"Starting Palette C2C training on GPU {gpu}")
+    
+    # Create data loaders using get_dataloaders directly
+    phase_loader, val_loader, test_loader = get_dataloaders(
+        config, 
+        config.root_image_dir,
+        metadata_path=str(Path(config.root_image_dir) / "metadata.jsonl")
     )
-
-    logger.info(f"Executing phase '{config.phase}' for model")
-    try:
-        if config.phase == "train":
-            model.train()
-        else:
-            model.test()
-    finally:
-        writer.close()
+    
+    # Create Palette network
+    from palette.models.palette_network import PaletteNetwork
+    network = PaletteNetwork(config=config)
+    
+    # Initialize network weights
+    if hasattr(network, 'init_weights'):
+        network.init_weights()
+    
+    # Create loss function
+    from palette.models.loss import mse_loss
+    loss_fn = mse_loss
+    
+    # Create optimizer (will be properly configured in the model)
+    optimizer_config = {"lr": config.learning_rate}
+    
+    # Create our integrated Palette model
+    training_model = TrainModel_C2C_Palette(
+        config=config,
+        train_dataloader=phase_loader,
+        val_dataloader=val_loader,
+        test_dataloader=test_loader,
+        networks=[network],
+        losses=[loss_fn],
+        sample_num=getattr(config, 'sample_num', 8),
+        optimizers=[optimizer_config],
+        metrics=None,
+        ema_scheduler=None,
+    )
+    
+    # Start training
+    if config.phase == "train":
+        training_model.train()
+    else:
+        training_model.test()
 
 
 @click.command()
-@click.option("-dr",  "--data_root", type=str,     default=None,                             help="Root directory for dataset")
-@click.option("-p",   "--phase",     type=str,     default="train",                          help="Model phase ('train' or 'test')")
-@click.option("-b",   "--batch",     type=int,     default=None,                             help="Batch size on every GPU")
-@click.option("-gpu", "--gpu_ids",   type=str,     default=None,                             help="GPU IDs to use (e.g., '0,1,2')")
-@click.option("-d",   "--debug",     is_flag=True,                                           help="Enable debug mode")
-@click.option("-P",   "--port",      type=str,     default="21012",                          help="Port for distributed training")
-def main(data_root: str, phase: str, batch: int, gpu_ids: str, debug: bool, port: str):
-    # Create configuration from dataclass instead of JSON
-    config = parse_dataclass_args(
-        root_image_dir=data_root,
-        phase=phase, 
-        batch=batch, 
-        gpu_ids=gpu_ids, 
-        debug=debug
-    )
+@click.option("--resume_state", "-r", default=None, help="Resume training state path")
+@click.option("--local_rank", "-l", default=None, type=int, help="Local rank for distributed training")
+@click.option("--num_gpus", "-n", default=1, type=int, help="Number of GPUs to use")
+def main(resume_state, local_rank, num_gpus):
+    """
+    Main entry point for Palette training with the new base model architecture.
+    Uses dataclass-based configuration instead of JSON config files.
+    """
+    print("Starting Palette training with dataclass configuration")
+    
+    # Parse configuration from command line arguments and dataclass defaults
+    config_obj = parse_dataclass_args()  # Returns TrainConfig_C2C_Palette
+    if resume_state is not None:
+        config_obj.resume_state = resume_state
+    if local_rank is not None:
+        config_obj.local_rank = local_rank
+    
+    print(f"Configuration loaded:")
+    print(f"  Phase: {config_obj.phase}")
+    print(f"  Name: {config_obj.name}")
+    print(f"  Distributed: {config_obj.distributed}")
+    print(f"  Number of GPUs: {num_gpus}")
 
-    if len(config.gpu_ids) > 0:
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(config.gpu_ids)
-        print(f"Using GPUs: {config.gpu_ids}")
-    else:
-        print("No GPUs specified - using CPU for training")
+    # Set multiprocessing method
+    if hasattr(mp, "_supports_context") and mp._supports_context:
+        mp.set_start_method("spawn", force=True)
 
-    if config.distributed:
-        ngpus_per_node = len(config.gpu_ids)
-        config.world_size = ngpus_per_node
-        config.init_method = f"tcp://127.0.0.1:{port}"
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, config))
+    if config_obj.distributed and num_gpus > 1:
+        print(f"Launching distributed training on {num_gpus} GPUs")
+        config_obj.world_size = num_gpus
+        config_obj.init_method = f"tcp://127.0.0.1:23456"  # Use default port
+        mp.spawn(main_worker, nprocs=num_gpus, args=(num_gpus, config_obj))
     else:
-        config.world_size = 1
-        main_worker(0, 1, config)
+        print("Running single GPU training")
+        config_obj.world_size = 1
+        config_obj.distributed = False
+        main_worker(0, 1, config_obj)
 
 
 if __name__ == "__main__":

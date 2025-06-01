@@ -122,14 +122,16 @@ class ImageCollator:
         self.task_name = task_name
 
     def __call__(self, batch_samples: List):
-        if self.task_name != "text2char":
+        if self.task_name == "text2char":
+            images, texts, masks = zip(*batch_samples)
+            texts = pad_sequence(texts, True)
+            masks = pad_sequence(masks, True)
+            batched_samples = list(zip(images, texts, masks))
+            return default_collate(batched_samples)
+        elif self.task_name == "char2char":
             return default_collate(batch_samples)
-
-        images, texts, masks = zip(*batch_samples)
-        texts = pad_sequence(texts, True)
-        masks = pad_sequence(masks, True)
-        batched_samples = list(zip(images, texts, masks))
-        return default_collate(batched_samples)
+        else:
+            return default_collate(batch_samples)
 
 
 def split_dataset(dataset: Dataset, validation_split: float | int, test_split: float | int = 0.0, 

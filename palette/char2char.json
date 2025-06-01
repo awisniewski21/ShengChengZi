@@ -51,11 +51,9 @@
                 }
             }
         }
-    },
-
-    "model": {
+    },        "model": {
         "which_model": {
-            "name": "PaletteModel",
+            "name": "PaletteC2CModel",
             "kwargs": {
                 "sample_num": 8,
                 "ema_scheduler": {

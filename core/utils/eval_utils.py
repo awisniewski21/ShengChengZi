@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
 from glyffuser import t5
-from shengchengzi.scz_c2c_bi import Char2CharBiModel
+from shengchengzi.c2cbi_scz import TrainNetwork_C2CBi_SCZ
 
 
 class DiffusionPipeline_R2C_Glyff(DDPMPipeline):
@@ -81,10 +81,10 @@ class DiffusionPipeline_C2CBi_SCZ(DiffusionPipeline):
     """
     Pipeline for text-to-image generation
     """
-    model: Char2CharBiModel
+    model: TrainNetwork_C2CBi_SCZ
     scheduler: DPMSolverMultistepScheduler
 
-    def __init__(self, model: Char2CharBiModel, scheduler: DDPMScheduler):
+    def __init__(self, model: TrainNetwork_C2CBi_SCZ, scheduler: DDPMScheduler):
         super().__init__()
         self.register_modules(model=model, scheduler=scheduler)
 

@@ -24,8 +24,11 @@ def set_seed(seed: int, gl_seed: int = 0):
 
 
 def set_device(obj, *args, **kwargs):
-    """ Move torch to GPU if available """
-    if torch.cuda.is_available():
+    """ Move torch to GPU/MPS if available """
+    # Check for available accelerator devices
+    has_accelerator = torch.cuda.is_available() # or (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available())
+    
+    if has_accelerator:
         if isinstance(obj, list):
             return [set_gpu(o, *args, **kwargs) for o in obj]
         elif isinstance(obj, dict):
@@ -40,10 +43,24 @@ def set_device(obj, *args, **kwargs):
 ###
 
 def set_gpu(obj, distributed: bool = False, rank: int = 0):
-    """ Move torch object to GPU or wrap with DDP """
+    """ Move torch object to GPU/MPS or wrap with DDP """
     if obj is None:
         return None
     elif distributed and isinstance(obj, torch.nn.Module):
-        return DDP(obj.cuda(), device_ids=[rank], output_device=rank, broadcast_buffers=True, find_unused_parameters=True)
+        if torch.cuda.is_available():
+            return DDP(obj.cuda(), device_ids=[rank], output_device=rank, broadcast_buffers=True, find_unused_parameters=True)
+        else:
+            # For non-CUDA devices like MPS, we can't use device_ids
+            return DDP(obj.to(get_device()), broadcast_buffers=True, find_unused_parameters=True)
     else:
-        return obj.cuda()
+        return obj.to(get_device())
+
+
+def get_device():
+    """Get the best available device"""
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    # elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    #     return torch.device('mps')
+    else:
+        return torch.device('cpu')

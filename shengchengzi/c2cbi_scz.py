@@ -4,7 +4,7 @@ from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 from configs.c2cbi_scz import TrainConfig_C2CBi_SCZ
 
 
-class Char2CharBiModel(torch.nn.Module):
+class TrainNetwork_C2CBi_SCZ(torch.nn.Module):
     def __init__(self, cfg: TrainConfig_C2CBi_SCZ):
         super().__init__()
         self.cfg = cfg

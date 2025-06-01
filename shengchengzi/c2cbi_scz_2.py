@@ -58,7 +58,7 @@ def my_vae_decoder_fwd(self: Decoder, sample: torch.Tensor, latent_embeds: torch
     return sample
 
 
-class Char2CharModelBi2(torch.nn.Module):
+class TrainNetwork_C2C_SCZ_2(torch.nn.Module):
     def __init__(
         self,
         cfg: TrainConfig_C2CBi_SCZ,

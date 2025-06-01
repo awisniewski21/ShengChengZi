@@ -40,7 +40,26 @@ def _warmup_beta(linear_start, linear_end, n_timestep, warmup_frac):
     betas[:warmup_time] = np.linspace(linear_start, linear_end, warmup_time, dtype=np.float64)
     return betas
 
-def make_beta_schedule(schedule, n_timestep, linear_start=1e-6, linear_end=1e-2, cosine_s=8e-3):
+def make_beta_schedule(config, phase="train", cosine_s=8e-3):
+    """
+    Create a beta schedule for diffusion.
+    
+    Args:
+        config: TrainConfig_C2C_Palette object containing schedule parameters
+        phase: Phase to use when extracting from config ('train' or 'test')
+        cosine_s: Cosine schedule parameter (only used for cosine schedule)
+    """
+    # Extract parameters from config
+    schedule = config.schedule
+    if phase == "train":
+        n_timestep = config.n_timestep_train
+        linear_start = config.linear_start_train
+        linear_end = config.linear_end_train
+    else:  # test phase
+        n_timestep = config.n_timestep_test
+        linear_start = config.linear_start_test
+        linear_end = config.linear_end_test
+    
     if schedule == "quad":
         betas = np.linspace(linear_start ** 0.5, linear_end ** 0.5, n_timestep, dtype=np.float64) ** 2
     elif schedule == "linear":
