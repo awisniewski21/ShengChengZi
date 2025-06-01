@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
-from configs.rand2char.glyffuser import TrainConfig_R2C_Glyff  # NOQA
+from configs.r2c_glyffuser import TrainConfig_R2C_Glyff  # NOQA
 from core.dataset.datasets import get_dataloaders
 from core.utils.eval_utils import evaluate_test_set
 from core.utils.repo_utils import get_repo_dir

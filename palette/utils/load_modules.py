@@ -6,7 +6,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from palette.utils.device_utils import set_seed
 from palette.utils.logger import InfoLogger
-from configs.char2char.palette import TrainConfig_C2C_Palette
+from configs.c2c_palette import TrainConfig_C2C_Palette
 from core.dataset.datasets import get_dataloader
 
 

@@ -19,7 +19,7 @@ from core.dataset.datasets import get_dataloaders
 from core.utils.eval_utils import evaluate_char_to_image_grid, evaluate_test_set  # NOQA
 from core.utils.repo_utils import get_repo_dir
 from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
-from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
+from configs.c2cbi_scz import TrainConfig_C2CBi_SCZ
 
 
 def train_loop(

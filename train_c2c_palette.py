@@ -14,7 +14,7 @@ from palette.utils.device_utils import set_seed
 from palette.utils.load_modules import define_dataloader, define_model  # NOQA
 from palette.utils.logger import InfoLogger, MetricsLogger
 from palette.utils.parser import parse_dataclass_args
-from configs.char2char.palette import TrainConfig_C2C_Palette
+from configs.c2c_palette import TrainConfig_C2C_Palette
 
 
 def main_worker(gpu: int, ngpus_per_node: int, config: TrainConfig_C2C_Palette):

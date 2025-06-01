@@ -6,7 +6,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
+from configs.c2cbi_scz import TrainConfig_C2CBi_SCZ
 
 
 def make_1step_sched(device: str):

@@ -10,7 +10,7 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 
 from core.utils.image_utils import tensor_to_image
-from configs.char2char.palette import TrainConfig_C2C_Palette
+from configs.c2c_palette import TrainConfig_C2C_Palette
 
 
 class MetricsTracker:

@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from configs.char2char.palette import TrainConfig_C2C_Palette
+from configs.c2c_palette import TrainConfig_C2C_Palette
 
 
 def parse_dataclass_args(root_image_dir: str = None, phase: str = "train", batch: int = None, gpu_ids: str = None, debug: bool = False, **kwargs) -> TrainConfig_C2C_Palette:

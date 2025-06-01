@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from palette.models.base_network import BaseNetwork
 from palette.utils.device_utils import set_device
 from palette.utils.logger import InfoLogger, MetricsLogger
-from configs.char2char.palette import TrainConfig_C2C_Palette
+from configs.c2c_palette import TrainConfig_C2C_Palette
 
 CustomResult = namedtuple("CustomResult", "name result")
 

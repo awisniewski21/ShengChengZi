@@ -1,7 +1,7 @@
 import torch
 from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 
-from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
+from configs.c2cbi_scz import TrainConfig_C2CBi_SCZ
 
 
 class Char2CharBiModel(torch.nn.Module):

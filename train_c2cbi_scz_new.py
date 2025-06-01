@@ -19,7 +19,7 @@ from core.dataset.datasets import get_dataloaders
 from core.utils.eval_utils import DiffusionPipeline_C2CBi_SCZ, evaluate_test_set  # NOQA
 from core.utils.repo_utils import get_repo_dir
 from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
-from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
+from configs.c2cbi_scz import TrainConfig_C2CBi_SCZ
 from shengchengzi.scz_c2c_bi import Char2CharBiModel
 
 
