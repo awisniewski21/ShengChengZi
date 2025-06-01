@@ -16,15 +16,15 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
 from core.dataset.datasets import get_dataloaders
-from core.utils.eval_utils import DiffusionPipelineChar2CharBi, evaluate_test_set  # NOQA
+from core.utils.eval_utils import DiffusionPipeline_C2CBi_SCZ, evaluate_test_set  # NOQA
 from core.utils.repo_utils import get_repo_dir
 from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
-from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
-from shengchengzi.models.scz_c2c_bi import Char2CharBiModel
+from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
+from shengchengzi.scz_c2c_bi import Char2CharBiModel
 
 
 def train_loop(
-    cfg: TrainingConfigChar2CharBi,
+    cfg: TrainConfig_C2CBi_SCZ,
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     test_dataloader: DataLoader,
@@ -78,7 +78,7 @@ def train_loop(
             global_step += 1
 
         model.eval()
-        pipeline = DiffusionPipelineChar2CharBi(model, noise_scheduler)
+        pipeline = DiffusionPipeline_C2CBi_SCZ(model, noise_scheduler)
         pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
         # Validation evaluation
@@ -156,7 +156,7 @@ def main():
     ROOT_IMAGE_DIR = get_repo_dir() / Path("data/datasets/paired_32x32")
     METADATA_PATH = ROOT_IMAGE_DIR / "metadata.jsonl"
 
-    cfg = TrainingConfigChar2CharBi(
+    cfg = TrainConfig_C2CBi_SCZ(
         image_size=32,
         train_batch_size=32,
         eval_batch_size=16,

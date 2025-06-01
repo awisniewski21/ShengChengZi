@@ -6,7 +6,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
+from configs.char2char_bi.shengchengzi import TrainConfig_C2CBi_SCZ
 
 
 def make_1step_sched(device: str):
@@ -61,7 +61,7 @@ def my_vae_decoder_fwd(self: Decoder, sample: torch.Tensor, latent_embeds: torch
 class Char2CharModelBi2(torch.nn.Module):
     def __init__(
         self,
-        cfg: TrainingConfigChar2CharBi,
+        cfg: TrainConfig_C2CBi_SCZ,
         device: str,
     ):
         super().__init__()

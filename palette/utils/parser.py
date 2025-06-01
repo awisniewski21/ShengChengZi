@@ -4,10 +4,10 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from configs.palette_config import TrainingConfigPalette
+from configs.char2char.palette import TrainConfig_C2C_Palette
 
 
-def parse_dataclass_args(root_image_dir: str = None, phase: str = "train", batch: int = None, gpu_ids: str = None, debug: bool = False, **kwargs) -> TrainingConfigPalette:
+def parse_dataclass_args(root_image_dir: str = None, phase: str = "train", batch: int = None, gpu_ids: str = None, debug: bool = False, **kwargs) -> TrainConfig_C2C_Palette:
     """
     Create palette configuration from dataclass instead of JSON.
     """
@@ -20,7 +20,7 @@ def parse_dataclass_args(root_image_dir: str = None, phase: str = "train", batch
     cfg_kwargs.update(kwargs)
     
     # Create config instance
-    cfg = TrainingConfigPalette(**cfg_kwargs)
+    cfg = TrainConfig_C2C_Palette(**cfg_kwargs)
     
     # Apply command line overrides
     cfg.phase = phase

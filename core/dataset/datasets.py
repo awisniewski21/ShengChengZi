@@ -11,8 +11,8 @@ from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from configs.base_config import TrainingConfigBase
-from glyffuser.models import t5
+from configs.base_config import TrainConfigBase
+from glyffuser import t5
 
 
 class UnpairedImageDataset(Dataset):
@@ -190,7 +190,7 @@ def split_dataset(dataset: Dataset, validation_split: float | int, test_split: f
     return train_dataset, val_dataset, test_dataset
 
 
-def get_dataloaders(cfg: TrainingConfigBase, *args, **kwargs) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def get_dataloaders(cfg: TrainConfigBase, *args, **kwargs) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Get train, validation, and test dataloaders with automatic splitting.
     
@@ -261,7 +261,7 @@ def get_dataloaders(cfg: TrainingConfigBase, *args, **kwargs) -> Tuple[DataLoade
     return train_dataloader, val_dataloader, test_dataloader
 
 
-def get_dataloader(cfg: TrainingConfigBase, *args, **kwargs) -> DataLoader:
+def get_dataloader(cfg: TrainConfigBase, *args, **kwargs) -> DataLoader:
     """
     Backward-compatible function that returns only the training dataloader.
     For new code, use get_dataloaders() instead to get train/val/test splits.

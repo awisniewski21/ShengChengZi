@@ -6,11 +6,11 @@ from torch.utils.data.distributed import DistributedSampler
 
 from palette.utils.device_utils import set_seed
 from palette.utils.logger import InfoLogger
-from configs.palette_config import TrainingConfigPalette
+from configs.char2char.palette import TrainConfig_C2C_Palette
 from core.dataset.datasets import get_dataloader
 
 
-def define_dataloader(config: TrainingConfigPalette, logger: InfoLogger):
+def define_dataloader(config: TrainConfig_C2C_Palette, logger: InfoLogger):
     """ Create train & validation dataloaders, or a test dataloader """
     # Use core dataset functionality
     dataloader = get_dataloader(
@@ -98,7 +98,7 @@ def define_dataloader(config: TrainingConfigPalette, logger: InfoLogger):
     return dataloader, val_dataloader
 
 
-def define_model(config: TrainingConfigPalette, logger: InfoLogger, **model_kwargs):
+def define_model(config: TrainConfig_C2C_Palette, logger: InfoLogger, **model_kwargs):
     """ Create a model instance based on the configuration options """
     from palette.models import PaletteModel
     
@@ -142,7 +142,7 @@ def define_model(config: TrainingConfigPalette, logger: InfoLogger, **model_kwar
     return model
 
 
-def define_network(config: TrainingConfigPalette, logger: InfoLogger):
+def define_network(config: TrainConfig_C2C_Palette, logger: InfoLogger):
     """ Create a network instance based on the configuration options """
     from palette.models import PaletteNetwork
     
@@ -190,7 +190,7 @@ def define_network(config: TrainingConfigPalette, logger: InfoLogger):
     return net
 
 
-def define_loss(config: TrainingConfigPalette, logger: InfoLogger):
+def define_loss(config: TrainConfig_C2C_Palette, logger: InfoLogger):
     """ Create a loss function based on the configuration """
     from palette.models import mse_loss, FocalLoss
     
@@ -205,7 +205,7 @@ def define_loss(config: TrainingConfigPalette, logger: InfoLogger):
     return loss_fn
 
 
-def define_metric(config: TrainingConfigPalette, logger: InfoLogger):
+def define_metric(config: TrainConfig_C2C_Palette, logger: InfoLogger):
     """ Create metric functions based on the configuration """
     from palette.models import mae, inception_score
     

@@ -8,7 +8,7 @@ from palette.models.base_model import BaseModel
 from palette.models.palette_network import PaletteNetwork
 from palette.models.utils import EMA
 from palette.utils.logger import MetricsTracker
-from configs.palette_config import TrainingConfigPalette
+from configs.char2char.palette import TrainConfig_C2C_Palette
 
 
 class PaletteModel(BaseModel):

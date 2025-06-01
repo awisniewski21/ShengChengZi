@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 
-from configs.base_config import TrainingConfigBase
+from configs.base_config import TrainConfigBase
 
 
 @dataclass
-class TrainingConfigText2Char(TrainingConfigBase):
+class TrainConfig_C2CBi_SCZ(TrainConfigBase):
     """ Model Params """
-    task_name: str = "text2char"                # Task name
-    text_encoder: str = "google-t5/t5-small"    # Text encoder model name
+    task_name: str = "char2char_bi"             # Task name
     encoder_dim: int = 1024                     # Encoder dimensions
     
     """ Training Params (moved from base) """

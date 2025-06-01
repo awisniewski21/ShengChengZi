@@ -10,7 +10,7 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 
 from core.utils.image_utils import tensor_to_image
-from configs.palette_config import TrainingConfigPalette
+from configs.char2char.palette import TrainConfig_C2C_Palette
 
 
 class MetricsTracker:
@@ -39,7 +39,7 @@ class MetricsLogger:
     """ 
     Wrapper around "tensorboard" library to record metrics and visuals
     """
-    def __init__(self, config: TrainingConfigPalette, logger: InfoLogger):
+    def __init__(self, config: TrainConfig_C2C_Palette, logger: InfoLogger):
         self.config = config
         self.logger = logger
 
@@ -88,7 +88,7 @@ class InfoLogger:
     """
     Wrapper around "logging" library, but only prints information for GPU 0
     """
-    def __init__(self, config: TrainingConfigPalette):
+    def __init__(self, config: TrainConfig_C2C_Palette):
         self.config = config
         self.rank = config.global_rank
         self.phase = config.phase

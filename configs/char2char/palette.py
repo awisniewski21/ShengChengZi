@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 from pathlib import Path
 
-from configs.base_config import TrainingConfigBase
+from configs.base_config import TrainConfigBase
 
 
 @dataclass
-class TrainingConfigPalette(TrainingConfigBase):
+class TrainConfig_C2C_Palette(TrainConfigBase):
     """Palette model configuration extending base config"""
 
     """ Dataset """

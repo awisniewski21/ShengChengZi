@@ -14,10 +14,10 @@ from diffusers.optimization import get_cosine_schedule_with_warmup
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from configs.base_config import TrainingConfigBase
+from configs.base_config import TrainConfigBase
 
 
-def setup_training_environment(cfg: TrainingConfigBase, task_prefix: str) -> Tuple[torch.device, str, str, SummaryWriter]:
+def setup_training_environment(cfg: TrainConfigBase, task_prefix: str) -> Tuple[torch.device, str, str, SummaryWriter]:
     """
     Set up the training environment with device, directories, and tensorboard writer.
     
@@ -50,7 +50,7 @@ def setup_training_environment(cfg: TrainingConfigBase, task_prefix: str) -> Tup
     return device, run_name, log_dir, writer
 
 
-def create_optimizer_and_scheduler(model: torch.nn.Module, cfg: TrainingConfigBase, train_dataloader: DataLoader):
+def create_optimizer_and_scheduler(model: torch.nn.Module, cfg: TrainConfigBase, train_dataloader: DataLoader):
     """
     Create optimizer and learning rate scheduler for training.
     

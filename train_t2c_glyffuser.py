@@ -15,16 +15,16 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
+from configs.text2char.glyffuser import TrainConfig_T2C_Glyff  # NOQA
 from core.dataset.datasets import get_dataloaders
 from core.utils.eval_utils import evaluate_test_set
 from core.utils.repo_utils import get_repo_dir
-from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
-from glyffuser.config.text2char_config import TrainingConfigText2Char
-from glyffuser.utils.eval_utils import DiffusionPipelineText2Char
+from core.utils.train_utils import create_optimizer_and_scheduler, setup_training_environment  # NOQA
+from core.utils.eval_utils import DiffusionPipeline_T2C_Glyff
 
 
 def train_loop(
-    cfg: TrainingConfigText2Char,
+    cfg: TrainConfig_T2C_Glyff,
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     test_dataloader: DataLoader,
@@ -68,7 +68,7 @@ def train_loop(
             global_step += 1
 
         model.eval()
-        pipeline = DiffusionPipelineText2Char(unet=model, scheduler=noise_scheduler)
+        pipeline = DiffusionPipeline_T2C_Glyff(unet=model, scheduler=noise_scheduler)
         pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
         # Validation evaluation
@@ -118,7 +118,7 @@ def main():
     ROOT_IMAGE_DIR = get_repo_dir() / Path("data/datasets/unpaired_32x32")
     METADATA_PATH = ROOT_IMAGE_DIR / "metadata.jsonl"
 
-    cfg = TrainingConfigText2Char(
+    cfg = TrainConfig_T2C_Glyff(
         image_size=32,
         train_batch_size=32,
         eval_batch_size=16,
