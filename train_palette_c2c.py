@@ -5,65 +5,57 @@ Palette model runner script.
 
 import os
 import warnings
-from typing import Dict
 
 import click
 import torch
 import torch.multiprocessing as mp
 
 from palette.utils.device_utils import set_seed
-from palette.utils.load_modules import define_dataloader, define_loss, define_metric, define_model, define_network  # NOQA
+from palette.utils.load_modules import define_dataloader, define_model  # NOQA
 from palette.utils.logger import InfoLogger, MetricsLogger
-from palette.utils.parser import parse_cli_args
+from palette.utils.parser import parse_dataclass_args
+from configs.palette_config import TrainingConfigPalette
 
 
-def main_worker(gpu: int, ngpus_per_node: int, opt: Dict):
+def main_worker(gpu: int, ngpus_per_node: int, config: TrainingConfigPalette):
     """
     Main function to run on each thread / GPU
     """
-    if "local_rank" not in opt:
-        opt["local_rank"] = opt["global_rank"] = gpu
+    if config.local_rank is None:
+        config.local_rank = config.global_rank = gpu
 
-    if opt["distributed"]:
-        torch.cuda.set_device(int(opt["local_rank"]))
-        print(f"Using GPU {int(opt['local_rank'])} for training")
+    if config.distributed:
+        torch.cuda.set_device(int(config.local_rank))
+        print(f"Using GPU {int(config.local_rank)} for training")
         torch.distributed.init_process_group(
             backend="nccl",
-            init_method=opt["init_method"],
-            world_size=opt["world_size"],
-            rank=opt["global_rank"],
+            init_method=config.init_method,
+            world_size=config.world_size,
+            rank=config.global_rank,
             group_name="mtorch",
         )
 
     torch.backends.cudnn.enabled = True
     warnings.warn("Using cuDNN for acceleration (torch.backends.cudnn.enabled=True)")
-    set_seed(opt["seed"])
+    set_seed(config.seed)
 
-    logger = InfoLogger(opt)
-    writer = MetricsLogger(opt, logger)
+    logger = InfoLogger(config)
+    writer = MetricsLogger(config, logger)
     logger.info(f"Created log file at '{writer.log_dir}'")
 
-    phase_loader, val_loader = define_dataloader(opt, logger)
-
-    networks = [define_network(net_opt, opt, logger) for net_opt in opt["model"]["which_networks"]]
-
-    metrics = [define_metric(metric_opt, logger) for metric_opt in opt["model"]["which_metrics"]]
-    losses = [define_loss(loss_opt, logger) for loss_opt in opt["model"]["which_losses"]]
+    phase_loader, val_loader = define_dataloader(config, logger)
 
     model = define_model(
-        opt,
+        config,
         logger,
-        networks=networks,
         phase_loader=phase_loader,
         val_loader=val_loader,
-        losses=losses,
-        metrics=metrics,
-        writer=writer,
+        writer=writer
     )
 
-    logger.info(f"Executing phase '{opt['phase']}' for model")
+    logger.info(f"Executing phase '{config.phase}' for model")
     try:
-        if opt["phase"] == "train":
+        if config.phase == "train":
             model.train()
         else:
             model.test()
@@ -72,29 +64,36 @@ def main_worker(gpu: int, ngpus_per_node: int, opt: Dict):
 
 
 @click.command()
-@click.option("-c",   "--config",  type=str,     default="palette/config/char2char.json", help="JSON file for configuration")
-@click.option("-p",   "--phase",   type=str,     default="train",                          help="Model phase ('train' or 'test')")
-@click.option("-b",   "--batch",   type=int,     default=None,                             help="Batch size on every GPU")
-@click.option("-gpu", "--gpu_ids", type=str,     default=None,                             help="GPU IDs to use (e.g., '0,1,2')")
-@click.option("-d",   "--debug",   is_flag=True,                                           help="Enable debug mode")
-@click.option("-P",   "--port",    type=str,     default="21012",                          help="Port for distributed training")
-def main(config: str, phase: str, batch: int, gpu_ids: str, debug: bool, port: str):
-    opt = parse_cli_args(config, phase, batch, gpu_ids, debug)
+@click.option("-dr",  "--data_root", type=str,     default=None,                             help="Root directory for dataset")
+@click.option("-p",   "--phase",     type=str,     default="train",                          help="Model phase ('train' or 'test')")
+@click.option("-b",   "--batch",     type=int,     default=None,                             help="Batch size on every GPU")
+@click.option("-gpu", "--gpu_ids",   type=str,     default=None,                             help="GPU IDs to use (e.g., '0,1,2')")
+@click.option("-d",   "--debug",     is_flag=True,                                           help="Enable debug mode")
+@click.option("-P",   "--port",      type=str,     default="21012",                          help="Port for distributed training")
+def main(data_root: str, phase: str, batch: int, gpu_ids: str, debug: bool, port: str):
+    # Create configuration from dataclass instead of JSON
+    config = parse_dataclass_args(
+        root_image_dir=data_root,
+        phase=phase, 
+        batch=batch, 
+        gpu_ids=gpu_ids, 
+        debug=debug
+    )
 
-    if len(opt["gpu_ids"]) > 0:
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(opt["gpu_ids"])
-        print(f"Using GPUs: {opt['gpu_ids']}")
+    if len(config.gpu_ids) > 0:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(config.gpu_ids)
+        print(f"Using GPUs: {config.gpu_ids}")
     else:
         print("No GPUs specified - using CPU for training")
 
-    if opt["distributed"]:
-        ngpus_per_node = len(opt["gpu_ids"])
-        opt["world_size"] = ngpus_per_node
-        opt["init_method"] = f"tcp://127.0.0.1:{port}"
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, opt))
+    if config.distributed:
+        ngpus_per_node = len(config.gpu_ids)
+        config.world_size = ngpus_per_node
+        config.init_method = f"tcp://127.0.0.1:{port}"
+        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, config))
     else:
-        opt["world_size"] = 1
-        main_worker(0, 1, opt)
+        config.world_size = 1
+        main_worker(0, 1, config)
 
 
 if __name__ == "__main__":

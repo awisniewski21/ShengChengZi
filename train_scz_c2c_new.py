@@ -15,9 +15,10 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
-from core.utils.eval_utils import DiffusionPipelineChar2CharBi
+from core.dataset.datasets import get_dataloaders
+from core.utils.eval_utils import DiffusionPipelineChar2CharBi, evaluate_test_set  # NOQA
 from core.utils.repo_utils import get_repo_dir
-from core.dataset.datasets import get_dataloader
+from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
 from shengchengzi.config.char2char_bi_config import TrainingConfigChar2CharBi
 from shengchengzi.models.scz_c2c_bi import Char2CharBiModel
 
@@ -25,21 +26,17 @@ from shengchengzi.models.scz_c2c_bi import Char2CharBiModel
 def train_loop(
     cfg: TrainingConfigChar2CharBi,
     train_dataloader: DataLoader,
-    eval_dataloader: DataLoader,
+    val_dataloader: DataLoader,
+    test_dataloader: DataLoader,
     model: Char2CharBiModel,
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     noise_scheduler: DDPMScheduler,
 ):
-    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    # Setup training environment
+    device, run_name, log_dir, writer = setup_training_environment(cfg, "train_shengchengzi_char2char_bi_new")
+    
     model = model.to(device)
-
-    # Tensorboard logging
-    if cfg.output_dir is not None:
-        os.makedirs(cfg.output_dir, exist_ok=True)
-    run_name = f"train_shengchengzi_char2char_bi_new_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    log_dir = str(Path(cfg.output_dir) / "logs" / run_name)
-    writer = SummaryWriter(log_dir=log_dir)
 
     global_step = 0
     for epoch in range(cfg.num_epochs):
@@ -84,21 +81,74 @@ def train_loop(
         pipeline = DiffusionPipelineChar2CharBi(model, noise_scheduler)
         pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
+        # Validation evaluation
+        if len(val_dataloader) > 0:
+            val_total_loss = 0.0
+            val_vae_loss = 0.0
+            val_diff_loss = 0.0
+            val_steps = 0
+            with torch.no_grad():
+                for val_imgs_src, val_imgs_trg, val_labels in val_dataloader:
+                    val_imgs_src = val_imgs_src.to(device)
+                    val_imgs_trg = val_imgs_trg.to(device)
+                    val_labels = val_labels.to(device)
+                    
+                    val_vae_recon_loss, val_diff_loss_val = model(val_imgs_src, val_imgs_trg, val_labels)
+                    val_total_loss_val = val_vae_recon_loss + val_diff_loss_val
+                    
+                    val_total_loss += val_total_loss_val.item()
+                    val_vae_loss += val_vae_recon_loss.item()
+                    val_diff_loss += val_diff_loss_val.item()
+                    val_steps += 1
+            
+            if val_steps > 0:
+                avg_val_total_loss = val_total_loss / val_steps
+                avg_val_vae_loss = val_vae_loss / val_steps
+                avg_val_diff_loss = val_diff_loss / val_steps
+                
+                writer.add_scalar("loss/total_validation", avg_val_total_loss, global_step)
+                writer.add_scalar("loss/vae_recon_validation", avg_val_vae_loss, global_step)
+                writer.add_scalar("loss/diff_validation", avg_val_diff_loss, global_step)
+                print(f"Epoch {epoch} - Val Total Loss: {avg_val_total_loss:.4f}, Val VAE Loss: {avg_val_vae_loss:.4f}, Val Diff Loss: {avg_val_diff_loss:.4f}")
+
         # Save model checkpoint
         if epoch % cfg.save_model_epochs == 0 or epoch == cfg.num_epochs - 1:
             if epoch > 0:
-                pipeline.save_pretrained(str(Path(cfg.output_dir) / "models" / run_name / f"epoch_{epoch}"))
-                pipeline.save_pretrained(str(Path(cfg.output_dir) / "models" / run_name / f"latest"))
+                save_dir = Path(cfg.output_dir) / "models" / run_name
+                save_dir.mkdir(parents=True, exist_ok=True)
+                pipeline.save_pretrained(str(save_dir / f"epoch_{epoch}"))
+                pipeline.save_pretrained(str(save_dir / "latest"))
 
         # Evaluate and log images
         if epoch % cfg.save_image_epochs == 0 or epoch == cfg.num_epochs - 1:
-            for (b_imgs_src, b_imgs_trg, b_labels) in eval_dataloader:
+            for (b_imgs_src, b_imgs_trg, b_labels) in val_dataloader:
                 b_imgs_src = b_imgs_src.to(device)
                 b_labels = b_labels.to(device)
                 img_grid = pipeline.evaluate_char_to_image_grid(b_imgs_src, b_labels, batch_size=cfg.eval_batch_size, output_type="numpy", seed=cfg.seed)
                 writer.add_images("eval_imgs", img_grid, global_step, dataformats="NHWC")
                 break
         writer.flush()
+    
+    # Final test set evaluation
+    print("\nRunning final test set evaluation...")
+    # Note: For this model, we'll evaluate using the VAE+diffusion loss
+    if test_dataloader is not None and len(test_dataloader) > 0:
+        test_total_loss = 0.0
+        test_steps = 0
+        with torch.no_grad():
+            for test_imgs_src, test_imgs_trg, test_labels in test_dataloader:
+                test_imgs_src = test_imgs_src.to(device)
+                test_imgs_trg = test_imgs_trg.to(device)
+                test_labels = test_labels.to(device)
+                
+                test_vae_recon_loss, test_diff_loss = model(test_imgs_src, test_imgs_trg, test_labels)
+                test_total_loss += (test_vae_recon_loss + test_diff_loss).item()
+                test_steps += 1
+        
+        avg_test_loss = test_total_loss / test_steps if test_steps > 0 else 0.0
+        writer.add_scalar("loss/total_test", avg_test_loss, global_step)
+        print(f"Test Results - Total Loss: {avg_test_loss:.4f}, Samples: {test_steps * test_dataloader.batch_size}")
+    
     writer.close()
 
 
@@ -115,9 +165,9 @@ def main():
         save_model_epochs=5,
     )
 
-    # Data loaders
-    train_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
-    eval_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH, batch_size=cfg.eval_batch_size, shuffle=False)
+    # Data loaders with train/val split
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
+    # Note: val_dataloader replaces the old eval_dataloader with proper train/val split
 
     # Model
     model = Char2CharBiModel(cfg)
@@ -125,17 +175,12 @@ def main():
     print(f"Total Model Parameters: {total_params:,}")
 
     # Optimizer and schedulers
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    lr_scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=cfg.lr_warmup_steps,
-        num_training_steps=len(train_dataloader) * cfg.num_epochs,
-    )
+    optimizer, lr_scheduler = create_optimizer_and_scheduler(model, cfg, train_dataloader)
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
 
     # Train the model
     print("Starting training...")
-    train_loop(cfg, train_dataloader, eval_dataloader, model, optimizer, lr_scheduler, noise_scheduler)
+    train_loop(cfg, train_dataloader, val_dataloader, test_dataloader, model, optimizer, lr_scheduler, noise_scheduler)
     print("Training completed!")
 
 

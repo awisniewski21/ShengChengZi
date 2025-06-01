@@ -2,7 +2,6 @@
     "name": "palette_char2char",
     "gpu_ids": [],
     "seed": -1,
-    "finetune_norm": false,
 
     "path": {
         "base_dir": "out",
@@ -59,7 +58,6 @@
             "name": "PaletteModel",
             "kwargs": {
                 "sample_num": 8,
-                "task": "colorization",
                 "ema_scheduler": {
                     "ema_start": 1,
                     "ema_iter": 1,
@@ -114,7 +112,6 @@
 
     "train": {
         "n_epoch": 1e8,
-        "n_iter": 1e8,
         "val_epoch": 1,
         "save_checkpoint_epoch": 10,
         "log_iter": 10,
@@ -125,6 +122,5 @@
         "val_epoch": 1,
         "save_checkpoint_epoch": 10,
         "log_iter": 10,
-        "debug_split": 50
     }
 }

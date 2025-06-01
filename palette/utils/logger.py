@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 import os
 from typing import Dict
@@ -9,6 +10,7 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 
 from core.utils.image_utils import tensor_to_image
+from configs.palette_config import TrainingConfigPalette
 
 
 class MetricsTracker:
@@ -37,17 +39,16 @@ class MetricsLogger:
     """ 
     Wrapper around "tensorboard" library to record metrics and visuals
     """
-    def __init__(self, opt: Dict, logger: InfoLogger):
-        self.opt = opt
+    def __init__(self, config: TrainingConfigPalette, logger: InfoLogger):
+        self.config = config
         self.logger = logger
 
         self.epoch = 0
         self.iter = 0
         self.phase = "train"
 
-        if opt["train"]["tensorboard"] and opt["global_rank"] == 0:
-            self.log_dir = os.path.join(opt["path"]["base_dir"], opt["path"]["log_dir"], opt["name"])
-            os.makedirs(self.log_dir, exist_ok=True)
+        if config.tensorboard and config.global_rank == 0:
+            self.log_dir = self.logger.log_dir
             self.writer = SummaryWriter(self.log_dir)
 
     def set_iter(self, epoch: int, iter: int, phase: str = "train"):
@@ -87,15 +88,15 @@ class InfoLogger:
     """
     Wrapper around "logging" library, but only prints information for GPU 0
     """
-    def __init__(self, opt: Dict):
-        self.opt = opt
-        self.rank = opt["global_rank"]
-        self.phase = opt["phase"]
+    def __init__(self, config: TrainingConfigPalette):
+        self.config = config
+        self.rank = config.global_rank
+        self.phase = config.phase
 
-        self.log_dir = os.path.join(opt["path"]["base_dir"], opt["path"]["log_dir"], opt["name"])
+        self.log_dir = os.path.join(config.log_dir, config.name + f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(self.log_dir, exist_ok=True)
-        self.setup_logger(None, self.log_dir, opt["phase"], level=logging.INFO, screen=False)
-        self.logger = logging.getLogger(opt["phase"])
+        self.setup_logger(None, self.log_dir, config.phase, level=logging.INFO, screen=False)
+        self.logger = logging.getLogger(config.phase)
 
     @staticmethod
     def setup_logger(logger_name: str, root: str, phase: str, level: int = logging.INFO, screen: bool = False):

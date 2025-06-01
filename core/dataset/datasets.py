@@ -1,16 +1,17 @@
 import glob
 import json
+import random
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from core.config.base_config import TrainingConfigBase
+from configs.base_config import TrainingConfigBase
 from glyffuser.models import t5
 
 
@@ -131,9 +132,76 @@ class ImageCollator:
         return default_collate(batched_samples)
 
 
-def get_dataloader(cfg: TrainingConfigBase, *args, batch_size: int | None = None, shuffle: bool = True, **kwargs) -> DataLoader:
+def split_dataset(dataset: Dataset, validation_split: float | int, test_split: float | int = 0.0, 
+                 shuffle: bool = True, seed: int = 0) -> Tuple[Dataset, Dataset, Dataset]:
+    """
+    Split a dataset into train, validation, and optionally test sets.
+    
+    Args:
+        dataset: The dataset to split
+        validation_split: Validation split (0.0-1.0 for percentage, or int for absolute count)
+        test_split: Test split (0.0-1.0 for percentage, or int for absolute count)
+        shuffle: Whether to shuffle the dataset before splitting
+        seed: Random seed for reproducibility
+        
+    Returns:
+        Tuple of (train_dataset, val_dataset, test_dataset). test_dataset is None if test_split=0
+    """
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    
+    if shuffle:
+        random.seed(seed)
+        random.shuffle(indices)
+    
+    # Calculate validation split size
+    if isinstance(validation_split, float):
+        if not 0.0 <= validation_split <= 1.0:
+            raise ValueError("validation_split must be between 0.0 and 1.0 when using percentage")
+        val_size = int(validation_split * dataset_size)
+    else:
+        val_size = validation_split
+        if val_size < 0 or val_size >= dataset_size:
+            raise ValueError(f"validation_split must be between 0 and {dataset_size-1} when using absolute count")
+    
+    # Calculate test split size
+    if isinstance(test_split, float):
+        if not 0.0 <= test_split <= 1.0:
+            raise ValueError("test_split must be between 0.0 and 1.0 when using percentage")
+        test_size = int(test_split * dataset_size)
+    else:
+        test_size = test_split
+        if test_size < 0 or test_size >= dataset_size:
+            raise ValueError(f"test_split must be between 0 and {dataset_size-1} when using absolute count")
+    
+    # Check that splits don't exceed dataset size
+    if val_size + test_size >= dataset_size:
+        raise ValueError(f"validation_split ({val_size}) + test_split ({test_size}) cannot exceed dataset size ({dataset_size})")
+    
+    # Create splits
+    test_indices = indices[:test_size] if test_size > 0 else []
+    val_indices = indices[test_size:test_size + val_size]
+    train_indices = indices[test_size + val_size:]
+    
+    train_dataset = Subset(dataset, train_indices)
+    val_dataset = Subset(dataset, val_indices)
+    test_dataset = Subset(dataset, test_indices) if test_size > 0 else None
+    
+    return train_dataset, val_dataset, test_dataset
+
+
+def get_dataloaders(cfg: TrainingConfigBase, *args, **kwargs) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    """
+    Get train, validation, and test dataloaders with automatic splitting.
+    
+    Args:
+        cfg: Training configuration containing split parameters
+        *args, **kwargs: Arguments passed to the dataset constructor
+        
+    Returns:
+        Tuple of (train_dataloader, val_dataloader, test_dataloader). test_dataloader is None if test_split=0
+    """
     cfg.task_name = cfg.task_name.lower()
-    batch_size = batch_size if batch_size is not None else cfg.train_batch_size
 
     transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
@@ -141,15 +209,62 @@ def get_dataloader(cfg: TrainingConfigBase, *args, batch_size: int | None = None
         transforms.ToTensor(),
     ])
 
+    # Create full dataset
     if cfg.task_name == "rand2char":
-        dataset = UnpairedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = UnpairedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "text2char":
-        dataset = UnpairedCaptionedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = UnpairedCaptionedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "char2char":
-        dataset = PairedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = PairedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "char2char_bi":
-        dataset = PairedBidirectionalImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = PairedBidirectionalImageDataset(*args, transform=transform, **kwargs)
     else:
         raise ValueError(f"Unknown task name: '{cfg.task_name}'")
 
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=ImageCollator(cfg.task_name))
+    # Split dataset
+    train_dataset, val_dataset, test_dataset = split_dataset(
+        full_dataset, 
+        cfg.validation_split, 
+        cfg.test_split, 
+        cfg.shuffle_dataset, 
+        cfg.seed
+    )
+    
+    # Create dataloaders
+    collate_fn = ImageCollator(cfg.task_name)
+    
+    train_dataloader = DataLoader(
+        train_dataset, 
+        batch_size=cfg.train_batch_size, 
+        shuffle=cfg.shuffle_dataset, 
+        collate_fn=collate_fn
+    )
+    
+    val_dataloader = DataLoader(
+        val_dataset, 
+        batch_size=cfg.eval_batch_size, 
+        shuffle=False, 
+        collate_fn=collate_fn
+    )
+    
+    test_dataloader = None
+    if test_dataset is not None:
+        test_dataloader = DataLoader(
+            test_dataset, 
+            batch_size=cfg.eval_batch_size, 
+            shuffle=False, 
+            collate_fn=collate_fn
+        )
+    
+    print(f"Dataset split: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_dataset) if test_dataset else 0}")
+    
+    return train_dataloader, val_dataloader, test_dataloader
+
+
+def get_dataloader(cfg: TrainingConfigBase, *args, **kwargs) -> DataLoader:
+    """
+    Backward-compatible function that returns only the training dataloader.
+    For new code, use get_dataloaders() instead to get train/val/test splits.
+    """
+    train_dataloader, _, _ = get_dataloaders(cfg, *args, **kwargs)
+    return train_dataloader

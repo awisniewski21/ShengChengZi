@@ -9,6 +9,11 @@ class TrainingConfigBase:
     """ Dataset """
     task_name: str                              # Task name ("rand2char", "text2char", "char2char", or "char2char_bi")
     image_size: int = 128                       # Image resolution
+    
+    """ Dataset Split """
+    validation_split: float | int = 0.2         # Validation split (0.0-1.0 for percentage, or int for absolute count)
+    test_split: float | int = 0.1               # Test split (0.0-1.0 for percentage, or int for absolute count)
+    shuffle_dataset: bool = True                # Shuffle dataset before splitting
 
     """ Training Params """
     num_epochs: int = 100                       # Training epochs
@@ -20,10 +25,8 @@ class TrainingConfigBase:
 
     """ Logging """
     output_dir: str = "out"                     # Output directory
-    overwrite_output_dir: bool = True           # Overwrite old models with the same name
     save_image_epochs: int = 10                 # Save training images every N epochs
     save_model_epochs: int = 30                 # Save model checkpoints every N epochs
-
 
     def __post_init__(self):
         self.output_dir = str(Path(get_repo_dir()) / self.output_dir)

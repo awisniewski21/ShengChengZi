@@ -8,6 +8,7 @@ from palette.models.base_model import BaseModel
 from palette.models.palette_network import PaletteNetwork
 from palette.models.utils import EMA
 from palette.utils.logger import MetricsTracker
+from configs.palette_config import TrainingConfigPalette
 
 
 class PaletteModel(BaseModel):
@@ -16,7 +17,6 @@ class PaletteModel(BaseModel):
         networks: List[PaletteNetwork],
         losses: List[Callable],
         sample_num: int,
-        task: str,
         optimizers: List[torch.optim.Optimizer],
         ema_scheduler: EMA | None = None,
         **kwargs,
@@ -36,16 +36,16 @@ class PaletteModel(BaseModel):
             self.ema_scheduler = None
 
         # Must convert network(s) using self.set_device if using multiple GPUs
-        self.netG = self.set_device(self.netG, distributed=self.opt["distributed"])
+        self.netG = self.set_device(self.netG, distributed=self.config.distributed)
         if self.ema_scheduler is not None:
-            self.netG_EMA = self.set_device(self.netG_EMA, distributed=self.opt["distributed"])
+            self.netG_EMA = self.set_device(self.netG_EMA, distributed=self.config.distributed)
         self.load_networks()
 
         self.optG = torch.optim.Adam(list(filter(lambda p: p.requires_grad, self.netG.parameters())), **optimizers[0])
         self.optimizers.append(self.optG)
         self.resume_training()
 
-        if self.opt["distributed"]:
+        if self.config.distributed:
             self.netG.module.set_loss(self.loss_fn)
             self.netG.module.set_new_noise_schedule(phase=self.phase)
         else:
@@ -58,7 +58,6 @@ class PaletteModel(BaseModel):
         self.test_metrics = MetricsTracker(*[m.__name__ for m in self.metrics], phase="test")
 
         self.sample_num = sample_num
-        self.task = task
 
     def set_input(self, data):
         """ Set input tensors to model """
@@ -99,7 +98,7 @@ class PaletteModel(BaseModel):
     def train_step(self):
         self.netG.train()
         self.train_metrics.reset()
-        for train_data in tqdm(self.phase_loader, desc="Train step", disable=self.opt["global_rank"] != 0):
+        for train_data in tqdm(self.phase_loader, desc="Train step", disable=self.config.global_rank != 0):
             self.set_input(train_data)
             self.optG.zero_grad()
             loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
@@ -109,7 +108,7 @@ class PaletteModel(BaseModel):
             self.iter += self.batch_size
             self.writer.set_iter(self.epoch, self.iter, phase="train")
             self.train_metrics.update(self.loss_fn.__name__, loss.item())
-            if self.iter % self.opt["train"]["log_iter"] == 0:
+            if self.iter % self.config.log_iter == 0:
                 for key, value in self.train_metrics.get_metrics_dict().items():
                     self.logger.info(f"{str(key):5s}: {value}\t")
                     self.writer.add_scalar(key, value)
@@ -128,9 +127,9 @@ class PaletteModel(BaseModel):
         self.netG.eval()
         self.val_metrics.reset()
         with torch.no_grad():
-            for val_data in tqdm(self.val_loader, desc="Val step", disable=self.opt["global_rank"] != 0):
+            for val_data in tqdm(self.val_loader, desc="Val step", disable=self.config.global_rank != 0):
                 self.set_input(val_data)
-                if self.opt["distributed"]:
+                if self.config.distributed:
                     self.output, self.visuals = self.netG.module.restoration(self.cond_image, sample_num=self.sample_num)
                 else:
                     self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
@@ -154,9 +153,9 @@ class PaletteModel(BaseModel):
         self.netG.eval()
         self.test_metrics.reset()
         with torch.no_grad():
-            for phase_data in tqdm(self.phase_loader, desc="Test step", disable=self.opt["global_rank"] != 0):
+            for phase_data in tqdm(self.phase_loader, desc="Test step", disable=self.config.global_rank != 0):
                 self.set_input(phase_data)
-                if self.opt["distributed"]:
+                if self.config.distributed:
                     self.output, self.visuals = self.netG.module.restoration(self.cond_image, sample_num=self.sample_num)
                 else:
                     self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
@@ -181,7 +180,7 @@ class PaletteModel(BaseModel):
 
     def load_networks(self):
         """ Load pretrained model and training state, only on GPU 0 """
-        if self.opt["distributed"]:
+        if self.config.distributed:
             netG_label = self.netG.module.__class__.__name__
         else:
             netG_label = self.netG.__class__.__name__
@@ -191,7 +190,7 @@ class PaletteModel(BaseModel):
 
     def save_everything(self):
         """ Save pretrained model and training state """
-        if self.opt["distributed"]:
+        if self.config.distributed:
             netG_label = self.netG.module.__class__.__name__
         else:
             netG_label = self.netG.__class__.__name__

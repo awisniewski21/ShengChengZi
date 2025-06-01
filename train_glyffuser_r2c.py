@@ -4,8 +4,8 @@ Random-to-Character model training runner.
 """
 
 import os
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -15,8 +15,10 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
+from core.dataset.datasets import get_dataloaders
+from core.utils.eval_utils import evaluate_test_set
 from core.utils.repo_utils import get_repo_dir
-from core.dataset.datasets import get_dataloader
+from core.utils.train_utils import setup_training_environment, create_optimizer_and_scheduler
 from glyffuser.config.rand2char_config import TrainingConfigRand2Char
 from glyffuser.utils.eval_utils import DiffusionPipelineRand2Char
 
@@ -24,21 +26,18 @@ from glyffuser.utils.eval_utils import DiffusionPipelineRand2Char
 def train_loop(
     cfg: TrainingConfigRand2Char,
     train_dataloader: DataLoader,
+    val_dataloader: DataLoader,
+    test_dataloader: DataLoader,
     model: UNet2DModel,
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     noise_scheduler: DDPMScheduler,
     inference_scheduler: DPMSolverMultistepScheduler,
 ):
-    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    # Setup training environment
+    device, run_name, log_dir, writer = setup_training_environment(cfg, "train_glyffuser_rand2char")
+    
     model = model.to(device)
-
-    # Tensorboard logging
-    if cfg.output_dir is not None:
-        os.makedirs(cfg.output_dir, exist_ok=True)
-    run_name = f"train_glyffuser_rand2char_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    log_dir = str(Path(cfg.output_dir) / "logs" / run_name)
-    writer = SummaryWriter(log_dir=log_dir)
 
     # Train loop
     global_step = 0
@@ -60,27 +59,54 @@ def train_loop(
             optimizer.step()
             lr_scheduler.step()
 
+            # Log training metrics
             logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0], "step": global_step}
+            writer.add_scalar("Loss/train", loss.detach().item(), global_step)
+            writer.add_scalar("LR", lr_scheduler.get_last_lr()[0], global_step)
             pbar.set_postfix(**logs)
-            writer.add_scalar("Loss/train", logs["loss"], global_step)
-            writer.add_scalar("LR", logs["lr"], global_step)
             global_step += 1
 
         model.eval()
         pipeline = DiffusionPipelineRand2Char(unet=model, scheduler=noise_scheduler)
         pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
+        # Validation evaluation
+        if len(val_dataloader) > 0:
+            val_loss = 0.0
+            val_steps = 0
+            with torch.no_grad():
+                for val_imgs in val_dataloader:
+                    val_imgs = val_imgs.to(device)
+                    noise = torch.randn_like(val_imgs)
+                    timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (val_imgs.shape[0],), device=device).long()
+                    val_imgs_noisy = noise_scheduler.add_noise(val_imgs, noise, timesteps)
+                    noise_pred = model(val_imgs_noisy, timesteps).sample
+                    val_loss += torch.nn.functional.mse_loss(noise_pred, noise).item()
+                    val_steps += 1
+            
+            avg_val_loss = val_loss / val_steps if val_steps > 0 else 0.0
+            if val_steps > 0:
+                writer.add_scalar("Loss/validation", avg_val_loss, global_step)
+                print(f"Epoch {epoch} - Validation Loss: {avg_val_loss:.4f}")
+
         # Save model checkpoint
         if epoch % cfg.save_model_epochs == 0 or epoch == cfg.num_epochs - 1:
             if epoch > 0:
-                pipeline.save_pretrained(str(Path(cfg.output_dir) / "models" / run_name / f"epoch_{epoch}"))
-                pipeline.save_pretrained(str(Path(cfg.output_dir) / "models" / run_name / f"latest"))
+                save_dir = Path(cfg.output_dir) / "models" / run_name
+                save_dir.mkdir(parents=True, exist_ok=True)
+                pipeline.save_pretrained(str(save_dir / f"epoch_{epoch}"))
+                pipeline.save_pretrained(str(save_dir / "latest"))
 
         # Evaluate and log images
         if epoch % cfg.save_image_epochs == 0 or epoch == cfg.num_epochs - 1:
             img_grid = pipeline.evaluate_texts_to_image_grid(batch_size=cfg.eval_batch_size, output_type="numpy", seed=cfg.seed)
             writer.add_images("eval_imgs", img_grid, global_step, dataformats="NHWC")
         writer.flush()
+    
+    # Final test set evaluation
+    print("\nRunning final test set evaluation...")
+    test_metrics = evaluate_test_set(model, test_dataloader, device, noise_scheduler, cfg.task_name, writer, global_step)
+    
     writer.close()
 
 
@@ -97,8 +123,8 @@ def main():
         save_model_epochs=5,
     )
 
-    # Data loader
-    train_dataloader = get_dataloader(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
+    # Data loaders with train/val split
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(cfg, root_image_dir=ROOT_IMAGE_DIR, metadata_path=METADATA_PATH)
 
     # Model
     model = UNet2DModel(
@@ -115,18 +141,13 @@ def main():
     print(f"Total Model Parameters: {total_params:,}")
 
     # Optimizer and schedulers
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    lr_scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=cfg.lr_warmup_steps,
-        num_training_steps=len(train_dataloader) * cfg.num_epochs,
-    )
+    optimizer, lr_scheduler = create_optimizer_and_scheduler(model, cfg, train_dataloader)
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
     inference_scheduler = DPMSolverMultistepScheduler(num_train_timesteps=1000)
 
     # Train the model
     print("Starting training...")
-    train_loop(cfg, train_dataloader, model, optimizer, lr_scheduler, noise_scheduler, inference_scheduler)
+    train_loop(cfg, train_dataloader, val_dataloader, test_dataloader, model, optimizer, lr_scheduler, noise_scheduler, inference_scheduler)
     print("Training completed!")
 
 

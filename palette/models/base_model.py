@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from palette.models.base_network import BaseNetwork
 from palette.utils.device_utils import set_device
 from palette.utils.logger import InfoLogger, MetricsLogger
+from configs.palette_config import TrainingConfigPalette
 
 CustomResult = namedtuple("CustomResult", "name result")
 
@@ -18,7 +19,7 @@ CustomResult = namedtuple("CustomResult", "name result")
 class BaseModel:
     def __init__(
         self,
-        opt: Dict,
+        config: TrainingConfigPalette,
         phase_loader: DataLoader,
         val_loader: DataLoader,
         metrics: List[Callable],
@@ -26,16 +27,22 @@ class BaseModel:
         writer: MetricsLogger,
     ):
         """ Initialize base model attributes """
-        self.opt = opt
+        self.config = config
         self.phase_loader = phase_loader
         self.val_loader = val_loader
         self.metrics = metrics
         self.logger = logger # Logger to log file (only works on GPU 0)
         self.writer = writer # Writer to tensorboard and result file
 
-        self.phase = opt["phase"]
-        self.batch_size = self.opt["datasets"][self.phase]["dataloader"]["kwargs"]["batch_size"]
-        self.set_device = partial(set_device, rank=opt["global_rank"])
+        self.phase = config.phase
+        if self.phase == "train":
+            self.batch_size = config.train_batch_size
+        elif self.phase == "val":
+            self.batch_size = config.eval_batch_size
+        else:  # test
+            self.batch_size = config.eval_batch_size
+            
+        self.set_device = partial(set_device, rank=config.global_rank)
         self.epoch = 0
         self.iter = 0
 
@@ -47,9 +54,9 @@ class BaseModel:
         """
         Main training loop
         """
-        while self.epoch <= self.opt["train"]["n_epoch"] and self.iter <= self.opt["train"]["n_iter"]:
+        while self.epoch <= self.config.num_epochs:
             self.epoch += 1
-            if self.opt["distributed"]:
+            if self.config.distributed:
                 # When shuffle=True, this ensures all replicas use a different random ordering for each epoch
                 self.phase_loader.sampler.set_epoch(self.epoch)
 
@@ -59,11 +66,11 @@ class BaseModel:
             for key, value in train_log.items():
                 self.logger.info(f"{str(key):5s}: {value}\t")
 
-            if self.epoch % self.opt["train"]["save_checkpoint_epoch"] == 0:
+            if self.epoch % self.config.save_model_epochs == 0:
                 self.logger.info(f"Saving the self at the end of epoch {self.epoch:.0f}")
                 self.save_everything()
 
-            if self.epoch % self.opt["train"]["val_epoch"] == 0:
+            if self.epoch % self.config.val_epoch == 0:
                 self.logger.info("\n\n\n------------------------------Validation Start------------------------------")
                 if self.val_loader is None:
                     self.logger.warning("Validation stop where dataloader is None, Skip it.")
@@ -90,7 +97,7 @@ class BaseModel:
 
     def print_network(self, network: BaseNetwork) -> None:
         """ Print network structure, only works on GPU 0 """
-        if self.opt["global_rank"] != 0:
+        if self.config.global_rank != 0:
             return
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
@@ -103,10 +110,10 @@ class BaseModel:
 
     def save_network(self, network: BaseNetwork, network_label: str) -> None:
         """ Save network structure, only works on GPU 0 """
-        if self.opt["global_rank"] != 0:
+        if self.config.global_rank != 0:
             return
         save_filename = f"{self.epoch}_{network_label}.pth"
-        save_path = os.path.join(self.opt["path"]["base_dir"], self.opt["path"]["model_dir"], self.opt["name"], save_filename)
+        save_path = os.path.join(self.config.model_dir, self.config.name, save_filename)
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         state_dict = network.state_dict()
@@ -116,11 +123,11 @@ class BaseModel:
 
     def load_network(self, network: BaseNetwork, network_label: str, strict: bool = True) -> None:
         """ Load a pretrained network if available """
-        if self.opt["path"]["resume_state"] is None:
+        if self.config.resume_state is None:
             return
         self.logger.info(f"Begin loading pretrained model '{network_label}'...")
 
-        model_path = f"{self.opt['path']['resume_state']}_{network_label}.pth"
+        model_path = f"{self.config.resume_state}_{network_label}.pth"
         if not os.path.exists(model_path):
             self.logger.warning(f"Not loading pretrained model from '{model_path}' since it does not exist.")
             return
@@ -132,7 +139,7 @@ class BaseModel:
 
     def save_training_state(self) -> None:
         """ Saves training state during training, only works on GPU 0 """
-        if self.opt["global_rank"] != 0:
+        if self.config.global_rank != 0:
             return
         assert isinstance(self.optimizers, list) and isinstance(self.schedulers, list), "optimizers and schedulers must be a list."
         state = {
@@ -142,17 +149,17 @@ class BaseModel:
             "optimizers": [o.state_dict() for o in self.optimizers],
         }
         save_filename = f"{self.epoch}.state"
-        save_path = os.path.join(self.opt["path"]["checkpoint"], save_filename)
+        save_path = os.path.join(self.config.model_dir, self.config.name, save_filename)
         torch.save(state, save_path)
 
     def resume_training(self) -> None:
         """ Resume the optimizers and schedulers for training, only works when phase is train or resume training enabled """
-        if self.phase != "train" or self.opt["path"]["resume_state"] is None:
+        if self.phase != "train" or self.config.resume_state is None:
             return
         self.logger.info("Begin loading training states")
         assert isinstance(self.optimizers, list) and isinstance(self.schedulers, list), "optimizers and schedulers must be a list."
 
-        state_path = f"{self.opt['path']['resume_state']}.state"
+        state_path = f"{self.config.resume_state}.state"
         if not os.path.exists(state_path):
             self.logger.warning(f"Not loading training state from '{state_path}' since it does not exist.")
             return

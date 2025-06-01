@@ -75,14 +75,14 @@ class DiffusionPipelineChar2CharBi(DiffusionPipeline):
         return np.tile((255 * imgs).clip(0, 255).astype(np.uint8), (1, 1, 1, 3))
 
 
-def evalaute_char_to_image_grid(model: UNet2DModel, eval_dataloader: DataLoader, device: str):
+def evaluate_char_to_image_grid(model: UNet2DModel, val_dataloader: DataLoader, device: str):
     """
     Evaluate the Char2CharModel on the first batch of a given DataLoader and return the generated images as a grid.
     """
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        for (b_imgs_src, b_imgs_trg, b_labels) in eval_dataloader:
+        for (b_imgs_src, b_imgs_trg, b_labels) in val_dataloader:
             b_imgs_src = b_imgs_src.to(device)
             b_labels = b_labels.to(device)
             B, C, H, W = b_imgs_src.shape
@@ -99,3 +99,80 @@ def evalaute_char_to_image_grid(model: UNet2DModel, eval_dataloader: DataLoader,
 
             triplets = torch.stack([b_imgs_src, pred_imgs, b_imgs_trg]).transpose(1, 0).reshape(B*3, C, H, W)
             return make_grid(triplets, nrow=3, padding=2, normalize=False)
+
+def evaluate_test_set(model, test_dataloader: DataLoader, device, noise_scheduler, task_name: str, writer=None, global_step=0):
+    """
+    Evaluate model on test set and return metrics.
+    
+    Args:
+        model: The trained model
+        test_dataloader: Test dataloader
+        device: Device to run evaluation on
+        noise_scheduler: Noise scheduler for diffusion models
+        task_name: Type of task ("rand2char", "text2char", "char2char", etc.)
+        writer: Optional tensorboard writer
+        global_step: Global step for logging
+        
+    Returns:
+        Dictionary of test metrics
+    """
+    if test_dataloader is None or len(test_dataloader) == 0:
+        print("No test data available for evaluation.")
+        return {}
+    
+    model.eval()
+    test_loss = 0.0
+    test_steps = 0
+    
+    print(f"Evaluating on test set ({len(test_dataloader)} batches)...")
+    
+    with torch.no_grad():
+        if task_name == "rand2char":
+            for test_imgs in test_dataloader:
+                test_imgs = test_imgs.to(device)
+                noise = torch.randn_like(test_imgs)
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (test_imgs.shape[0],), device=device).long()
+                test_imgs_noisy = noise_scheduler.add_noise(test_imgs, noise, timesteps)
+                noise_pred = model(test_imgs_noisy, timesteps).sample
+                test_loss += torch.nn.functional.mse_loss(noise_pred, noise).item()
+                test_steps += 1
+                
+        elif task_name == "text2char":
+            for test_imgs, test_texts_embed, test_masks in test_dataloader:
+                test_imgs = test_imgs.to(device)
+                test_texts_embed = test_texts_embed.to(device)
+                test_masks = test_masks.to(device)
+                
+                noise = torch.randn_like(test_imgs)
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (test_imgs.shape[0],), device=device).long()
+                test_imgs_noisy = noise_scheduler.add_noise(test_imgs, noise, timesteps)
+                noise_pred = model(test_imgs_noisy, timesteps, encoder_hidden_states=test_texts_embed).sample
+                test_loss += torch.nn.functional.mse_loss(noise_pred, noise).item()
+                test_steps += 1
+                
+        elif task_name in ["char2char", "char2char_bi"]:
+            for test_imgs_src, test_imgs_trg, test_labels in test_dataloader:
+                test_imgs_src = test_imgs_src.to(device)
+                test_imgs_trg = test_imgs_trg.to(device)
+                test_labels = test_labels.to(device) if test_labels is not None else None
+                
+                noise = torch.randn_like(test_imgs_trg)
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (test_imgs_trg.shape[0],), device=device).long()
+                test_imgs_noisy = noise_scheduler.add_noise(test_imgs_trg, noise, timesteps)
+                noise_pred = model(test_imgs_noisy, timesteps).sample
+                test_loss += torch.nn.functional.mse_loss(noise_pred, noise).item()
+                test_steps += 1
+    
+    avg_test_loss = test_loss / test_steps if test_steps > 0 else 0.0
+    
+    test_metrics = {
+        "test_loss": avg_test_loss,
+        "test_samples": test_steps * test_dataloader.batch_size
+    }
+    
+    print(f"Test Results - Loss: {avg_test_loss:.4f}, Samples: {test_metrics['test_samples']}")
+    
+    if writer is not None:
+        writer.add_scalar("Loss/test", avg_test_loss, global_step)
+        
+    return test_metrics
