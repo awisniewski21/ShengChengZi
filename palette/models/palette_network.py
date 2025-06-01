@@ -1,33 +1,103 @@
 from functools import partial
-from typing import Callable, Dict
+from typing import Callable, Tuple
 
 import numpy as np
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 
-from palette.models.base_network import BaseNetwork
-from palette.models.utils import default, extract, make_beta_schedule  # NOQA
+from configs import TrainConfig_C2C_Palette
+from palette.models.utils import extract, make_beta_schedule  # NOQA
 
 
-class PaletteNetwork(BaseNetwork):
-    def __init__(self, unet_kwargs: Dict, beta_schedule_kwargs: Dict, module_name: str = "sr3", **kwargs):
-        super(PaletteNetwork, self).__init__(**kwargs)
-        if module_name == "sr3":
-            from .sr3_modules.unet import UNet
-        elif module_name == "guided_diffusion":
-            from .guided_diffusion_modules.unet import UNet
-        else:
-            raise NotImplementedError(f"Module '{module_name}' is not implemented")
+class PaletteNetwork(nn.Module):
+    def __init__(
+        self,
+        config: TrainConfig_C2C_Palette,
+        loss_fn: Callable = torch.nn.functional.mse_loss,
+        init_type: str = "kaiming",
+        gain: float = 0.02
+    ):
+        super().__init__()
 
-        self.denoise_fn = UNet(**unet_kwargs)
-        self.beta_schedule = beta_schedule_kwargs
-
-    def set_loss(self, loss_fn: Callable):
+        self.config = config
         self.loss_fn = loss_fn
+        self.init_type = init_type
+        self.gain = gain
 
-    def set_new_noise_schedule(self, device: torch.device = torch.device("cpu"), phase: str = "train"):
+        if config.module_name == "sr3":
+            from .sr3_modules.unet import UNet
+            self.denoise_fn = UNet(
+                in_channel=config.in_channel,
+                out_channel=config.out_channel,
+                inner_channel=config.inner_channel,
+                channel_mults=tuple(config.channel_mults),
+                attn_res=tuple(config.attn_res),
+                res_blocks=config.res_blocks,
+                dropout=config.dropout,
+                image_size=config.image_size
+            )
+        elif config.module_name == "guided_diffusion":
+            from .guided_diffusion_modules.unet import UNet
+            self.denoise_fn = UNet(
+                image_size=config.image_size,
+                in_channel=config.in_channel,
+                inner_channel=config.inner_channel,
+                out_channel=config.out_channel,
+                res_blocks=config.res_blocks,
+                attn_res=tuple(config.attn_res),
+                dropout=config.dropout,
+                channel_mults=tuple(config.channel_mults),
+                num_head_channels=config.num_head_channels,
+                use_checkpoint=False,
+                use_scale_shift_norm=True,
+                resblock_updown=True,
+                use_new_attention_order=False,
+            )
+        else:
+            raise NotImplementedError(f"Module '{config.module_name}' is not implemented")
+
+    def init_weights(self):
+        """
+        Initialize network weights
+        See: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py#L68
+        """
+
+        def init_func(m: nn.Module):
+            classname = m.__class__.__name__
+            if classname.find("InstanceNorm2d") != -1:
+                if hasattr(m, "weight") and m.weight is not None:
+                    nn.init.constant_(m.weight.data, 1.0)
+                if hasattr(m, "bias") and m.bias is not None:
+                    nn.init.constant_(m.bias.data, 0.0)
+            elif hasattr(m, "weight") and (classname.find("Conv") != -1 or classname.find("Linear") != -1):
+                if self.init_type == "normal":
+                    nn.init.normal_(m.weight.data, 0.0, self.gain)
+                elif self.init_type == "xavier":
+                    nn.init.xavier_normal_(m.weight.data, gain=self.gain)
+                elif self.init_type == "xavier_uniform":
+                    nn.init.xavier_uniform_(m.weight.data, gain=1.0)
+                elif self.init_type == "kaiming":
+                    nn.init.kaiming_normal_(m.weight.data, a=0, mode="fan_in")
+                elif self.init_type == "orthogonal":
+                    nn.init.orthogonal_(m.weight.data, gain=self.gain)
+                elif self.init_type == "none": # Use pytorch's default init method
+                    m.reset_parameters()
+                else:
+                    raise NotImplementedError("initialization method [%s] is not implemented" % self.init_type)
+                if hasattr(m, "bias") and m.bias is not None:
+                    nn.init.constant_(m.bias.data, 0.0)
+
+        self.apply(init_func)
+
+        # Propagate to children
+        for m in self.children():
+            if hasattr(m, "init_weights"):
+                m.init_weights(self.init_type, self.gain)
+
+    def set_new_noise_schedule(self, device: torch.device, phase: str = "train"):
         to_torch = partial(torch.tensor, dtype=torch.float32, device=device)
-        betas = make_beta_schedule(**self.beta_schedule[phase])
+        betas = make_beta_schedule(config=self.config, phase=phase)
         betas = betas.detach().cpu().numpy() if isinstance(betas, torch.Tensor) else betas
         alphas = 1.0 - betas
 
@@ -75,7 +145,8 @@ class PaletteNetwork(BaseNetwork):
         return model_mean, posterior_log_variance
 
     def q_sample(self, y_0, sample_gammas, noise=None):
-        noise = default(noise, lambda: torch.randn_like(y_0))
+        if noise is None:
+            noise = torch.randn_like(y_0)
         return sample_gammas.sqrt() * y_0 + (1.0 - sample_gammas).sqrt() * noise
 
     @torch.no_grad()
@@ -85,40 +156,37 @@ class PaletteNetwork(BaseNetwork):
         return model_mean + noise * (0.5 * model_log_variance).exp()
 
     @torch.no_grad()
-    def restoration(self, y_cond, y_t=None, y_0=None, mask=None, sample_num=8):
+    def restoration(self, y_cond: torch.Tensor, y_t: torch.Tensor | None = None, sample_num: int = 8) -> Tuple[torch.Tensor, torch.Tensor]:
         b, *_ = y_cond.shape
 
         assert self.num_timesteps > sample_num, "num_timesteps must be greater than sample_num"
         sample_inter = self.num_timesteps // sample_num
         
-        y_t = default(y_t, lambda: torch.randn_like(y_cond))
+        if y_t is None:
+            y_t = torch.randn_like(y_cond)
         ret_arr = y_t
         for i in tqdm(reversed(range(0, self.num_timesteps)), desc="Val step - restoration", total=self.num_timesteps):
             t = torch.full((b,), i, device=y_cond.device, dtype=torch.long)
             y_t = self.p_sample(y_t, t, y_cond=y_cond)
-            if mask is not None:
-                y_t = y_0 * (1.0 - mask) + mask * y_t
             if i % sample_inter == 0:
                 ret_arr = torch.cat([ret_arr, y_t], dim=0)
         return y_t, ret_arr
 
-    def forward(self, y_0, y_cond=None, mask=None, noise=None):
+    def forward(self, y_0: torch.Tensor, y_cond: torch.Tensor | None = None, noise: torch.Tensor | None = None) -> float:
         # Sample from p(gammas)
         b, *_ = y_0.shape
-        t = torch.randint(1, self.num_timesteps, (b,), device=y_0.device).long()
+        t = torch.randint(1, self.num_timesteps, (b,)).long()
+        t = t.to(y_0.device)
         gamma_t1 = extract(self.gammas, t - 1, x_shape=(1, 1))
         sqrt_gamma_t2 = extract(self.gammas, t, x_shape=(1, 1))
         sample_gammas = (sqrt_gamma_t2 - gamma_t1) * torch.rand((b, 1), device=y_0.device) + gamma_t1
         sample_gammas = sample_gammas.view(b, -1)
 
-        noise = default(noise, lambda: torch.randn_like(y_0))
+        if noise is None:
+            noise = torch.randn_like(y_0)
         y_noisy = self.q_sample(y_0=y_0, sample_gammas=sample_gammas.view(-1, 1, 1, 1), noise=noise)
 
-        if mask is not None:
-            noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy * mask + (1.0 - mask) * y_0], dim=1), sample_gammas)
-            loss = self.loss_fn(mask * noise, mask * noise_hat)
-        else:
-            noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
-            loss = self.loss_fn(noise, noise_hat)
+        noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
+        loss = self.loss_fn(noise, noise_hat)
 
         return loss

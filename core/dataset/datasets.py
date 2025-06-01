@@ -1,7 +1,7 @@
 import glob
 import json
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
@@ -10,8 +10,9 @@ from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from core.config.base_config import TrainingConfigBase
-from glyffuser.models import t5
+from configs import TrainConfigBase
+from core.dataset.dataset_utils import split_dataset
+from glyffuser import t5
 
 
 class UnpairedImageDataset(Dataset):
@@ -64,9 +65,9 @@ class UnpairedCaptionedImageDataset(UnpairedImageDataset):
     def __getitem__(self, idx: int):
         image = super().__getitem__(idx)
 
-        caption = self.samples[idx][self.caption_label]
-        caption_embed, caption_attn_mask = t5.t5_encode_text([caption], name=self.caption_encoder, return_attn_mask=True)
-        return image, caption_embed.squeeze(), caption_attn_mask.squeeze()
+        raw_caption = self.samples[idx][self.caption_label]
+        caption_embed, caption_attn_mask = t5.t5_encode_text([raw_caption], name=self.caption_encoder, return_attn_mask=True)
+        return image, caption_embed.squeeze(), caption_attn_mask.squeeze(), raw_caption
 
 
 class PairedImageDataset(Dataset):
@@ -121,35 +122,60 @@ class ImageCollator:
         self.task_name = task_name
 
     def __call__(self, batch_samples: List):
-        if self.task_name != "text2char":
+        if self.task_name == "text2char":
+            images, texts_embed, texts_mask, raw_texts = zip(*batch_samples)
+            texts_embed = pad_sequence(texts_embed, True)
+            texts_mask = pad_sequence(texts_mask, True)
+            batched_samples = list(zip(images, texts_embed, texts_mask, raw_texts))
+            return default_collate(batched_samples)
+        elif self.task_name == "char2char":
+            return default_collate(batch_samples)
+        else:
             return default_collate(batch_samples)
 
-        images, texts, masks = zip(*batch_samples)
-        texts = pad_sequence(texts, True)
-        masks = pad_sequence(masks, True)
-        batched_samples = list(zip(images, texts, masks))
-        return default_collate(batched_samples)
 
-
-def get_dataloader(cfg: TrainingConfigBase, *args, batch_size: int | None = None, shuffle: bool = True, **kwargs) -> DataLoader:
-    cfg.task_name = cfg.task_name.lower()
-    batch_size = batch_size if batch_size is not None else cfg.train_batch_size
-
+def get_dataset(cfg: TrainConfigBase, *args, **kwargs) -> Dataset:
     transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
         transforms.Resize((cfg.image_size, cfg.image_size)),
         transforms.ToTensor(),
     ])
 
+    cfg.task_name = cfg.task_name.lower()
     if cfg.task_name == "rand2char":
-        dataset = UnpairedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = UnpairedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "text2char":
-        dataset = UnpairedCaptionedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = UnpairedCaptionedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "char2char":
-        dataset = PairedImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = PairedImageDataset(*args, transform=transform, **kwargs)
     elif cfg.task_name == "char2char_bi":
-        dataset = PairedBidirectionalImageDataset(*args, transform=transform, **kwargs)
+        full_dataset = PairedBidirectionalImageDataset(*args, transform=transform, **kwargs)
     else:
         raise ValueError(f"Unknown task name: '{cfg.task_name}'")
 
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=ImageCollator(cfg.task_name))
+    return full_dataset
+
+
+def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = None, **kwargs) -> Tuple[DataLoader, DataLoader | None, DataLoader | None]:
+    """
+    Get train, validation, and test dataloaders for the given task's dataset
+    """
+    if full_dataset is None:
+        full_dataset = get_dataset(cfg, *args, **kwargs)
+
+    train_dataset, val_dataset, test_dataset = split_dataset(full_dataset, cfg)
+
+    collate_fn = ImageCollator(cfg.task_name)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=cfg.train_batch_size, shuffle=True, collate_fn=collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if val_dataset is not None else None
+    test_dataloader = DataLoader(test_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if test_dataset is not None else None
+
+    print("Dataset split:")
+    print(f"    Train: {len(train_dataset)} images ({len(train_dataloader)} batches)")
+    if val_dataset is not None:
+        print(f"    Val: {len(val_dataset)} images ({len(val_dataloader)} batches)")
+    if test_dataset is not None:
+        print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
+
+    return train_dataloader, val_dataloader, test_dataloader

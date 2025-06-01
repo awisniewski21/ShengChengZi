@@ -1,22 +1,19 @@
-#!/usr/bin/env python3
-"""
-Generates image datasets of Chinese characters from Unihan data and font files
-"""
-
 from pathlib import Path
 
 import click
 
-from core.utils.dataset_utils import gen_dataset, load_unihan_data  # NOQA
+from core.dataset.dataset_utils import gen_dataset, load_unihan_data  # NOQA
 from core.utils.repo_utils import get_repo_dir
 
 
 @click.command()
 @click.option("-d", "--dataset-type", type=str, default="both", help="Type of dataset to generate ('unpaired', 'paired', or 'both')")
 @click.option("-i", "--image-size",   type=int, default=64,     help="Image size in pixels")
-@click.option("-f", "--font-size",    type=int, default=None,     help="Font size of characters in images (None to auto-scale)")
+@click.option("-f", "--font-size",    type=int, default=None,   help="Font size of characters in images (None to auto-scale)")
 def main(dataset_type: str, image_size: int, font_size: int):
-    """ Generate Chinese character datasets from Unihan data and font files. """
+    """
+    Generate Chinese character datasets from Unihan data and font files
+    """
     dataset_type = dataset_type.lower()
     image_size = (image_size, image_size)
     font_size = font_size if font_size is not None else int(100 * (image_size[0] / 128))
