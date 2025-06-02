@@ -17,8 +17,9 @@ def to_out_img(img: torch.Tensor, value_range: Tuple[int, int]) -> torch.Tensor:
     assert value_range == (0, 255), f"Unsupported value range: {value_range}"
     return img.to(torch.uint8).cpu()
 
-def make_image_grid(*imgs_out: List[torch.Tensor]) -> torch.Tensor:
+def make_image_grid(imgs_out: List[torch.Tensor]) -> torch.Tensor:
     nrow = len(imgs_out) if len(imgs_out) > 1 else int(np.sqrt(len(imgs_out[0])))
     imgs_out_grid = torch.cat([i.unsqueeze(0) for i in imgs_out], dim=0)
     imgs_out_grid = einops.rearrange(imgs_out_grid, 'n b c h w -> (b n) c h w')
-    return make_grid(imgs_out_grid, nrow=nrow, padding=2)
+    img_grid = make_grid(imgs_out_grid, nrow=nrow, padding=2)
+    return einops.rearrange(img_grid, 'c h w -> c w h')

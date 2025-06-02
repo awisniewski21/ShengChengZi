@@ -16,8 +16,6 @@ def main():
     # Config
     cfg = TrainConfig_C2C_Palette(
         image_size=32,
-        train_batch_size=16,
-        eval_batch_size=8,
         eval_epoch_interval=1,
         checkpoint_epoch_interval=5,
     )

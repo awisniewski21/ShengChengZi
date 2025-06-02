@@ -105,7 +105,9 @@ class TrainModelBase(ABC):
 
             if self.global_step % self.config.log_step_interval == 0:
                 self.writer.add_scalar("train_step/loss", loss, self.global_step)
-                self.writer.add_scalar("train_step/learning_rate", self.optimizer.param_groups[0]["lr"], self.global_step)
+                if self.lr_scheduler is not None:
+                    self.writer.add_scalar("train_step/learning_rate", self.optimizer.param_groups[0]["lr"], self.global_step)
+                self.writer.flush()
 
         return {
             "loss": epoch_metrics["loss"] / epoch_metrics["count"],
@@ -208,3 +210,4 @@ class TrainModelBase(ABC):
         """
         for key, value in metrics.items():
             self.writer.add_scalar(f"{phase}/{key}", value, log_step)
+        self.writer.flush()
