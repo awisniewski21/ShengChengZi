@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple
 
+import matplotlib.pyplot as plt
 import torch
 from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DConditionModel  # NOQA
 from diffusers.pipelines.pipeline_utils import ImagePipelineOutput  # NOQA
@@ -71,6 +72,8 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
             grid_img = make_image_grid([pred_imgs_out, trg_imgs_out])
             self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
             self.writer.add_text(f"{phase}/image_captions", str(dict(enumerate(src_texts_raw))), self.current_epoch)
+            plt.imshow(grid_img.permute(1, 2, 0).detach().cpu().numpy())
+            plt.show()
 
         return eval_loss.item()
 

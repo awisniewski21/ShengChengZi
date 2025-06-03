@@ -29,7 +29,7 @@ def setup_train(cfg: TrainConfigBase, task_prefix: str) -> Tuple[torch.device, s
         os.makedirs(cfg.output_dir, exist_ok=True)
 
     run_name = f"{task_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    log_dir = str(Path(cfg.output_dir) / "logs" / run_name)
+    log_dir = str(cfg.output_dir / "logs" / run_name)
     writer = SummaryWriter(log_dir=log_dir)
 
     return device, run_name, log_dir, writer

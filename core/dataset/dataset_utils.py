@@ -8,7 +8,7 @@ from typing import Tuple
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 from torch.utils.data import Dataset, Subset
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from configs import TrainConfigBase
 

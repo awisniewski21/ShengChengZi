@@ -1,5 +1,6 @@
 from typing import Dict
 
+import matplotlib.pyplot as plt
 import torch
 from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel  # NOQA
 
@@ -56,6 +57,8 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
             pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
             grid_img = make_image_grid([pred_imgs_out])
             self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
+            plt.imshow(grid_img.permute(1, 2, 0).detach().cpu().numpy())
+            plt.show()
 
         return 0
 

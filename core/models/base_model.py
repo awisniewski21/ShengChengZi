@@ -63,13 +63,13 @@ class TrainModelBase(ABC):
             print(f"Epoch {epoch}/{self.config.num_epochs}: {train_metrics}")
 
             # Validation epoch
-            if self.val_dataloader is not None and (epoch + 1) % self.config.eval_epoch_interval == 0:
+            if self.val_dataloader is not None and epoch % self.config.eval_epoch_interval == 0:
                 val_metrics = self.eval_epoch("val")
                 self.log_metrics(val_metrics, self.current_epoch, "val")
                 print(f"Validation at epoch {epoch}: {val_metrics}")
 
             # Save model checkpoint
-            if (epoch + 1) % self.config.checkpoint_epoch_interval == 0:
+            if epoch > 0 and epoch % self.config.checkpoint_epoch_interval == 0:
                 self.save_checkpoint()
                 print(f"Saved checkpoint at epoch {epoch}")
 
@@ -174,8 +174,9 @@ class TrainModelBase(ABC):
         Save the current model to a checkpoint file
         """
         chkpt_data = self.get_checkpoint_data()
-        torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_epoch_{self.current_epoch}.pt")
         torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_latest.pt")
+        if self.current_epoch % (self.config.checkpoint_epoch_interval * 2) == 0:
+            torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_epoch_{self.current_epoch}.pt")
 
     def load_checkpoint(self, checkpoint_path: str | Path):
         """

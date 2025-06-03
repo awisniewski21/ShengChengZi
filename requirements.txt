@@ -1,8 +1,10 @@
 diffusers
 einops
+matplotlib
 numpy<2.*
 pandas
 Pillow
+rich-click
 setuptools
 torch
 torchvision
