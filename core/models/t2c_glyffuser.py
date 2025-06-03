@@ -72,8 +72,10 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
             grid_img = make_image_grid([pred_imgs_out, trg_imgs_out])
             self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
             self.writer.add_text(f"{phase}/image_captions", str(dict(enumerate(src_texts_raw))), self.current_epoch)
-            plt.imshow(grid_img.permute(1, 2, 0).detach().cpu().numpy())
+            grid_img_np = grid_img.permute(1, 2, 0).detach().cpu().numpy()
+            plt.imshow(grid_img_np)
             plt.show()
+            plt.imsave(self.images_dir / f"{phase}_epoch_{self.current_epoch}.png", grid_img_np)
 
         return eval_loss.item()
 

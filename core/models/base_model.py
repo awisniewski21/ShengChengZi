@@ -41,6 +41,8 @@ class TrainModelBase(ABC):
 
         self.net = self.net.to(self.device)
 
+        self.images_dir = Path(self.log_dir) / "images"
+        self.images_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir = Path(self.log_dir) / "checkpoints"
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -175,8 +177,8 @@ class TrainModelBase(ABC):
         """
         chkpt_data = self.get_checkpoint_data()
         torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_latest.pt")
-        if self.current_epoch % (self.config.checkpoint_epoch_interval * 2) == 0:
-            torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_epoch_{self.current_epoch}.pt")
+        # if self.current_epoch % (self.config.checkpoint_epoch_interval * 2) == 0:
+        #     torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_epoch_{self.current_epoch}.pt")
 
     def load_checkpoint(self, checkpoint_path: str | Path):
         """

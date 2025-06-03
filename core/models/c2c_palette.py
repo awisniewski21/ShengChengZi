@@ -59,8 +59,10 @@ class TrainModel_C2C_Palette(TrainModelBase):
             pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
             grid_img = make_image_grid([src_imgs_out, pred_imgs_out, trg_imgs_out])
             self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
-            plt.imshow(grid_img.permute(1, 2, 0).detach().cpu().numpy())
+            grid_img_np = grid_img.permute(1, 2, 0).detach().cpu().numpy()
+            plt.imshow(grid_img_np)
             plt.show()
+            plt.imsave(self.images_dir / f"{phase}_epoch_{self.current_epoch}.png", grid_img_np)
 
         return eval_loss.item()
 
