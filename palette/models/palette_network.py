@@ -95,7 +95,7 @@ class PaletteNetwork(nn.Module):
             if hasattr(m, "init_weights"):
                 m.init_weights(self.init_type, self.gain)
 
-    def set_new_noise_schedule(self, device: torch.device, phase: str = "train"):
+    def set_new_noise_schedule(self, device: torch.device, phase: str):
         to_torch = partial(torch.tensor, dtype=torch.float32, device=device)
         betas = make_beta_schedule(config=self.config, phase=phase)
         betas = betas.detach().cpu().numpy() if isinstance(betas, torch.Tensor) else betas
@@ -165,7 +165,7 @@ class PaletteNetwork(nn.Module):
         if y_t is None:
             y_t = torch.randn_like(y_cond)
         ret_arr = y_t
-        for i in tqdm(reversed(range(0, self.num_timesteps)), desc="Val step - restoration", total=self.num_timesteps):
+        for i in tqdm(reversed(range(0, self.num_timesteps)), total=self.num_timesteps):
             t = torch.full((b,), i, device=y_cond.device, dtype=torch.long)
             y_t = self.p_sample(y_t, t, y_cond=y_cond)
             if i % sample_inter == 0:

@@ -1,6 +1,5 @@
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
-import matplotlib.pyplot as plt
 import torch
 from diffusers import DDPMScheduler, UNet2DModel
 
@@ -42,7 +41,7 @@ class TrainModel_C2CBi_SCZ(TrainModelBase):
 
         return loss.item()
 
-    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], phase: str, log_images: bool) -> float:
+    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None]:
         src_imgs, trg_imgs, labels = batch_data
         src_imgs = src_imgs.to(self.device)
         trg_imgs = trg_imgs.to(self.device)
@@ -55,24 +54,18 @@ class TrainModel_C2CBi_SCZ(TrainModelBase):
 
         eval_loss = torch.nn.functional.mse_loss(pred_imgs.float(), trg_imgs.float(), reduction="mean")
 
-        if log_images:
-            src_imgs_out = to_out_img(src_imgs, (0, 1))
-            trg_imgs_out = to_out_img(trg_imgs, (0, 1))
-            pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
-            grid_img = make_image_grid([src_imgs_out, pred_imgs_out, trg_imgs_out])
-            self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
-            grid_img_np = grid_img.permute(1, 2, 0).detach().cpu().numpy()
-            plt.imshow(grid_img_np)
-            plt.show()
-            plt.imsave(self.images_dir / f"{phase}_epoch_{self.current_epoch}.png", grid_img_np)
+        src_imgs_out = to_out_img(src_imgs, (0, 1))
+        trg_imgs_out = to_out_img(trg_imgs, (0, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([src_imgs_out, pred_imgs_out, trg_imgs_out])
 
-        return eval_loss.item()
+        return eval_loss.item(), grid_img, None
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
         chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()
         return chkpt_data
 
-    def load_checkpoint_data(self, chkpt_data: Dict):
+    def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data)
         self.noise_scheduler.load_state_dict(chkpt_data["noise_scheduler_state"])

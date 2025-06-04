@@ -1,6 +1,5 @@
-from typing import Dict
+from typing import Dict, List, Tuple
 
-import matplotlib.pyplot as plt
 import torch
 from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel  # NOQA
 
@@ -42,27 +41,21 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
 
         return train_loss.item()
 
-    def eval_step(self, batch_data: torch.Tensor, phase: str, log_images: bool) -> float:
-        if log_images:
-            eval_pipeline = DDPMPipeline(unet=self.net, scheduler=self.inference_scheduler)
-            eval_pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
+    def eval_step(self, batch_data: torch.Tensor, phase: str) -> Tuple[float, torch.Tensor, List[str] | None]:
+        eval_pipeline = DDPMPipeline(unet=self.net, scheduler=self.inference_scheduler)
+        eval_pipeline.set_progress_bar_config(desc="Generating evaluation image grid...")
 
-            pred_imgs = eval_pipeline(
-                batch_size=self.config.eval_batch_size,
-                generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-                num_inference_steps=self.inference_scheduler.num_inference_steps,
-                output_type="numpy",
-            ).images
+        pred_imgs = eval_pipeline(
+            batch_size=self.config.eval_batch_size,
+            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
+            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            output_type="numpy",
+        ).images
 
-            pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
-            grid_img = make_image_grid([pred_imgs_out])
-            self.writer.add_image(f"{phase}/images", grid_img, self.current_epoch)
-            grid_img_np = grid_img.permute(1, 2, 0).detach().cpu().numpy()
-            plt.imshow(grid_img_np)
-            plt.show()
-            plt.imsave(self.images_dir / f"{phase}_epoch_{self.current_epoch}.png", grid_img_np)
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([pred_imgs_out])
 
-        return 0
+        return 0, grid_img, None
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
@@ -70,7 +63,7 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
         chkpt_data["inference_scheduler_state"] = self.inference_scheduler.state_dict()
         return chkpt_data
 
-    def load_checkpoint_data(self, chkpt_data: Dict):
+    def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data)
         self.noise_scheduler.load_state_dict(chkpt_data["noise_scheduler_state"])
         self.inference_scheduler.load_state_dict(chkpt_data["inference_scheduler_state"])

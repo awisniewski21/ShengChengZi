@@ -19,5 +19,5 @@ def to_out_img(img: torch.Tensor, value_range: Tuple[int, int]) -> torch.Tensor:
 
 def make_image_grid(imgs_out: List[torch.Tensor]) -> torch.Tensor:
     imgs_out_grid = torch.cat([i.unsqueeze(0) for i in imgs_out], dim=0)
-    imgs_out_grid = einops.rearrange(imgs_out_grid, 'n b c h w -> (b n) c h w')
-    return make_grid(imgs_out_grid, nrow=imgs_out[0], padding=2)
+    imgs_out_grid = einops.rearrange(imgs_out_grid, 'n b c h w -> (n b) c h w')
+    return make_grid(imgs_out_grid, nrow=imgs_out[0].shape[0], padding=2)
