@@ -1,16 +1,18 @@
 import sys
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
 from configs import TrainConfigBase
-from core.utils.train_utils import setup_train
+from core.dataset.datasets import get_dataloaders
+from core.utils.train_utils import get_device
 
 
 class TrainModelBase(ABC):
@@ -22,42 +24,35 @@ class TrainModelBase(ABC):
         self,
         *,
         config: TrainConfigBase,
-        train_dataloader: DataLoader | None,
-        val_dataloader: DataLoader | None,
-        test_dataloader: DataLoader | None,
         net: nn.Module,
         optimizer: torch.optim.Optimizer | None,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-        task_prefix: str,
     ):
         self.config = config
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
-        self.test_dataloader = test_dataloader
         self.net = net
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.task_prefix = task_prefix if optimizer is not None else task_prefix.replace("train", "test")
 
-        self.device, self.run_name, self.log_dir, self.writer = setup_train(self.config, self.task_prefix)
-
+        self.device = get_device()
         self.net = self.net.to(self.device)
-
-        self.images_dir = Path(self.log_dir) / "images"
-        self.images_dir.mkdir(parents=True, exist_ok=True)
-        if self.optimizer is not None:
-            self.checkpoint_dir = Path(self.log_dir) / "checkpoints"
-            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
+        self.run_name = f"{self.config.run_name_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.current_epoch = 0
         self.global_step = 0
 
+        self.train_dataloader, self.val_dataloader, self.test_dataloader = get_dataloaders(
+            self.config, 
+            root_image_dir=self.config.root_image_dir, 
+            metadata_path=self.config.image_metadata_path,
+        )
 
     def train(self):
         """
         Main training loop that handles training, evaluation, and logging
         """
-        print(f"Starting {self.task_prefix} training for {self.config.num_epochs} epochs...")
+        print(f"Starting {self.config.run_name_prefix} training for {self.config.num_epochs} epochs...")
+
+        assert self.optimizer is not None, "Optimizer must be defined for training"
+        self.writer = SummaryWriter(log_dir=str(self.log_dir))
 
         for epoch in range(self.config.num_epochs):
             self.current_epoch = epoch
@@ -74,9 +69,7 @@ class TrainModelBase(ABC):
                 print(f"Validation at epoch {epoch}: {val_metrics}")
 
             # Save model checkpoint
-            if epoch > 0 and epoch % self.config.checkpoint_epoch_interval == 0:
-                self.save_checkpoint()
-                print(f"Saved checkpoint at epoch {epoch}")
+            self.save_checkpoint()
 
         print("Training completed!")
         self.writer.close()
@@ -175,7 +168,7 @@ class TrainModelBase(ABC):
         Override this method to include additional attributes for derived models
         """
         return {
-            "config": self.config,
+            "config": self.config.to_dict(),
             "run_name": self.run_name,
             "current_epoch": self.current_epoch,
             "global_step": self.global_step,
@@ -189,17 +182,18 @@ class TrainModelBase(ABC):
         Save the current model to a checkpoint file
         """
         chkpt_data = self.get_checkpoint_data()
-        torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_latest.pt")
-        # if self.current_epoch % (self.config.checkpoint_epoch_interval * 2) == 0:
-        #     torch.save(chkpt_data, self.checkpoint_dir / f"{self.task_prefix}_epoch_{self.current_epoch}.pt")
+        torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_latest.pt")
+        if (self.current_epoch > 0 and self.current_epoch % self.config.checkpoint_epoch_interval == 0) or self.current_epoch == self.config.num_epochs - 1:
+            torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_epoch_{self.current_epoch}.pt")
+            print(f"Saved checkpoint at epoch {self.current_epoch}")
 
-    def load_checkpoint(self, checkpoint_path: str | Path, phase: str):
+    def load_checkpoint(self, phase: str):
         """
         Load a model from a checkpoint file
         """
-        chkpt_data = torch.load(checkpoint_path, map_location=self.device)
+        chkpt_data = torch.load(self.config.load_checkpoint_path, map_location=self.device)
         self.load_checkpoint_data(chkpt_data, phase)
-        print(f"Loaded checkpoint from {checkpoint_path}")
+        print(f"Loaded checkpoint from {self.config.load_checkpoint_path}")
         print(f"  Resuming from epoch {self.current_epoch}, step {self.global_step}")
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
@@ -207,14 +201,41 @@ class TrainModelBase(ABC):
         Load a model using the checkpoint data
         Override this method to load additional attributes for derived models
         """
-        self.config = chkpt_data["config"]
+        # Load and update config
+        chkpt_config: Dict = chkpt_data["config"]
+        chkpt_config.update({
+            "run_name_prefix": self.config.run_name_prefix,
+            "use_colab": self.config.use_colab,
+        })
+        self.config = self.config.from_dict(chkpt_config)
+
+        # Load and update model state
         self.current_epoch = chkpt_data["current_epoch"]
         self.global_step = chkpt_data["global_step"]
         self.net.load_state_dict(chkpt_data["model_state_dict"])
         if phase.lower() == "train":
             self.optimizer.load_state_dict(chkpt_data["optimizer_state_dict"])
-        if phase.lower() == "train" and self.lr_scheduler is not None:
-            self.lr_scheduler.load_state_dict(chkpt_data["lr_scheduler_state_dict"])
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.load_state_dict(chkpt_data["lr_scheduler_state_dict"])
+
+        # Reinitialize dataloaders with updated config
+        self.train_dataloader, self.val_dataloader, self.test_dataloader = get_dataloaders(
+            self.config, 
+            root_image_dir=self.config.root_image_dir, 
+            metadata_path=self.config.image_metadata_path,
+        )
+
+    @property
+    def log_dir(self) -> Path:
+        return self._create_dir(self.config.output_dir / "logs" / self.run_name)
+
+    @property
+    def images_dir(self) -> Path:
+        return self._create_dir(self.log_dir / "images")
+
+    @property
+    def checkpoint_dir(self) -> Path:
+        return self._create_dir(self.log_dir / "checkpoints")
 
 
     ###
@@ -239,6 +260,13 @@ class TrainModelBase(ABC):
 
         grid_img_np = out_grid_img.permute(1, 2, 0).detach().cpu().numpy()
         plt.imsave(self.images_dir / f"{phase}_epoch_{self.current_epoch}_{batch_ix}.png", grid_img_np)
-        if "ipykernel" in sys.modules:
+        if "ipykernel" in sys.modules: # Only display images inside Jupyter notebooks
             plt.imshow(grid_img_np)
             plt.show()
+
+    def _create_dir(self, dir_path: Path) -> Path:
+        """
+        Create a directory if it doesn't exist
+        """
+        dir_path.mkdir(parents=True, exist_ok=True)
+        return dir_path

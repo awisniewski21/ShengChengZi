@@ -16,7 +16,7 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
     net: UNet2DModel
 
     def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DPMSolverMultistepScheduler, **kwargs):
-        super().__init__(task_prefix="train_r2c_glyffuser", **kwargs)
+        super().__init__(**kwargs)
 
         self.noise_scheduler = noise_scheduler
         self.inference_scheduler = inference_scheduler

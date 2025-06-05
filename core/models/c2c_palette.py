@@ -18,7 +18,7 @@ class TrainModel_C2C_Palette(TrainModelBase):
     net: PaletteNetwork
 
     def __init__(self, **kwargs):
-        super().__init__(task_prefix="train_c2c_palette", **kwargs)
+        super().__init__(**kwargs)
 
         self.net.set_new_noise_schedule(self.device, "train")
 
@@ -36,6 +36,8 @@ class TrainModel_C2C_Palette(TrainModelBase):
         self.optimizer.zero_grad()
         train_loss.backward()
         self.optimizer.step()
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
 
         if self.config.ema_enabled:
             if self.global_step > self.config.ema_start and self.global_step % self.config.ema_iter == 0:

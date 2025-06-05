@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from configs import TrainConfigBase
 
@@ -9,6 +8,9 @@ from configs import TrainConfigBase
 class TrainConfig_C2C_Palette(TrainConfigBase):
     """ Dataset """
     task_name: str = "char2char"                # Task name
+
+    """ Training Params """
+    run_name_prefix: str = "train_c2c_palette"  # Prefix for run names
 
     """ Model Params """
     # UNet

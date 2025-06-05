@@ -1,17 +1,18 @@
 import glob
 import json
+import random
+from collections import defaultdict
 from pathlib import Path
 from typing import Callable, List, Tuple
 
 from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
 from configs import TrainConfigBase
-from core.dataset.dataset_utils import split_dataset
 from glyffuser import t5
 
 
@@ -179,3 +180,57 @@ def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = 
         print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
 
     return train_dataloader, val_dataloader, test_dataloader
+
+
+###
+### Helper Functions
+###
+
+def split_dataset(dataset: Dataset, cfg: TrainConfigBase) -> Tuple[Dataset, Dataset, Dataset]:
+    """
+    Split a dataset into train, validation, and test sets
+    Ensures that all samples for the same character are in the same split
+    """
+    dataset_size = len(dataset)
+
+    def get_split_size(split_val):
+        if isinstance(split_val, float):
+            assert 0.0 <= split_val <= 1.0, "Data splits must be [0.0, 1.0] or [0, dataset_size]"
+            return int(split_val * dataset_size)
+        else:
+            assert 0 <= split_val < dataset_size, "Data splits must be [0.0, 1.0] or [0, dataset_size]"
+            return split_val if split_val > 0 else 0
+
+    val_size = get_split_size(cfg.validation_split)
+    test_size = get_split_size(cfg.test_split)
+    assert val_size + test_size < dataset_size, "Validation and test splits must be less than dataset size"
+
+    if not isinstance(dataset, PairedImageDataset):
+        # Unpaired datasets - Each index is its own group
+        all_ixs_grouped = [[ix] for ix in range(dataset_size)]
+    else:
+        # Paired datasets - Group indices so that all samples for the same character are in the same split
+        # Assumes image file names are formatted as "<unicode>_<sequence>.png"
+        all_ixs_grouped = defaultdict(list)
+        for ix, sample in enumerate(dataset.dataset_s.samples):
+            char_unicode_num = Path(sample[dataset.f_label_s]).stem.split("_")[0]
+            all_ixs_grouped[char_unicode_num].extend([2*ix, 2*ix+1] if isinstance(dataset, PairedBidirectionalImageDataset) else [ix])
+        all_ixs_grouped = list(all_ixs_grouped.values())
+
+    random.seed(cfg.seed)
+    random.shuffle(all_ixs_grouped)
+
+    test_indices, val_indices, train_indices = [], [], []
+    for ixs in all_ixs_grouped:
+        if len(test_indices) < test_size:
+            test_indices.extend(ixs)
+        elif len(val_indices) < val_size:
+            val_indices.extend(ixs)
+        else:
+            train_indices.extend(ixs)
+
+    train_dataset = Subset(dataset, train_indices)
+    val_dataset = Subset(dataset, val_indices) if val_size > 0 else None
+    test_dataset = Subset(dataset, test_indices) if test_size > 0 else None
+
+    return train_dataset, val_dataset, test_dataset

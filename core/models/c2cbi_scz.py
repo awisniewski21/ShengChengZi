@@ -16,7 +16,7 @@ class TrainModel_C2CBi_SCZ(TrainModelBase):
     net: UNet2DModel
 
     def __init__(self, *, noise_scheduler: DDPMScheduler, **kwargs):
-        super().__init__(task_prefix="train_c2cbi_shengchengzi", **kwargs)
+        super().__init__(**kwargs)
 
         self.noise_scheduler = noise_scheduler
 

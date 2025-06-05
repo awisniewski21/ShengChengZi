@@ -10,10 +10,7 @@ from core.dataset.datasets import get_dataloaders
 from core.models import TrainModel_R2C_Glyffuser
 
 
-def train_r2c_glyffuser(**config_kwargs):
-    # Config
-    cfg = TrainConfig_R2C_Glyff(**config_kwargs)
-
+def train_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
     print(f"Starting Rand2Char training with Glyffuser model:")
     print(f"    Dataset: {cfg.root_image_dir.name}")
     print(f"    Image size: {cfg.image_size}")
@@ -21,14 +18,12 @@ def train_r2c_glyffuser(**config_kwargs):
     print(f"    Epochs: {cfg.num_epochs}")
     print(f"    Learning rate: {cfg.learning_rate}")
 
-    # Dataloaders
-    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(
+    train_dataloader, _, _ = get_dataloaders(
         cfg, 
         root_image_dir=cfg.root_image_dir, 
-        metadata_path=cfg.image_metadata_path
+        metadata_path=cfg.image_metadata_path,
     )
 
-    # Network
     net = UNet2DModel(
         sample_size=cfg.image_size,
         in_channels=1,
@@ -42,7 +37,6 @@ def train_r2c_glyffuser(**config_kwargs):
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f"Trainable network parameters: {total_params:,}")
 
-    # Optimizer and schedulers
     optimizer = torch.optim.AdamW(net.parameters(), lr=cfg.learning_rate)
     lr_scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer,
@@ -52,12 +46,8 @@ def train_r2c_glyffuser(**config_kwargs):
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
     inference_scheduler = DPMSolverMultistepScheduler(num_train_timesteps=1000)
 
-    # Model
     training_model = TrainModel_R2C_Glyffuser(
         config=cfg,
-        train_dataloader=train_dataloader,
-        val_dataloader=val_dataloader,
-        test_dataloader=test_dataloader,
         net=net,
         optimizer=optimizer,
         lr_scheduler=lr_scheduler,
@@ -65,27 +55,28 @@ def train_r2c_glyffuser(**config_kwargs):
         inference_scheduler=inference_scheduler,
     )
 
-    # Training loop
     training_model.train()
 
     return training_model
 
 
 @click.command()
-@click.option("--image-size", default=32, type=int, help="Image resolution")
-@click.option("--validation-split", default=16, type=click.FLOAT, help="Validation split (0.0-1.0 or int for absolute count)")
-@click.option("--test-split", default=16, type=click.FLOAT, help="Test split (0.0-1.0 or int for absolute count)")
-@click.option("--num-epochs", default=100, type=int, help="Training epochs")
-@click.option("--train-batch-size", default=16, type=int, help="Training batch size (number of images)")
-@click.option("--eval-batch-size", default=16, type=int, help="Evaluation batch size (number of images)")
-@click.option("--learning-rate", default=1e-4, type=float, help="Model learning rate")
-@click.option("--seed", default=0, type=int, help="Seed for random number generators")
-@click.option("--log-step-interval", default=1, type=int, help="Log metrics every N steps")
-@click.option("--eval-epoch-interval", default=1, type=int, help="Run validation every N epochs")
-@click.option("--checkpoint-epoch-interval", default=5, type=int, help="Save model checkpoints every N epochs")
-@click.option("--use-colab", is_flag=True, help="Use Google Colab environment paths")
-def main(*args, **kwargs):
-    train_r2c_glyffuser(*args, **kwargs)
+@click.option("-s",   "--image-size",                type=int,     help="Image resolution")
+@click.option("-vs",  "--validation-split",          type=float,   help="Validation split (0.0-1.0 or int for absolute count)")
+@click.option("-ts",  "--test-split",                type=float,   help="Test split (0.0-1.0 or int for absolute count)")
+@click.option("-e",   "--num-epochs",                type=int,     help="Training epochs")
+@click.option("-tbs", "--train-batch-size",          type=int,     help="Training batch size (number of images)")
+@click.option("-ebs", "--eval-batch-size",           type=int,     help="Evaluation batch size (number of images)")
+@click.option("-lr",  "--learning-rate",             type=float,   help="Model learning rate")
+@click.option("-s",   "--seed",                      type=int,     help="Seed for random number generators")
+@click.option("-si",  "--log-step-interval",         type=int,     help="Log metrics every N steps")
+@click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
+@click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")
+@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
+def main(**kwargs):
+    filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    cfg = TrainConfig_R2C_Glyff(**filtered_kwargs)
+    return train_r2c_glyffuser(cfg)
 
 
 if __name__ == "__main__":
