@@ -29,15 +29,22 @@ For a given Chinese character, generate an image of its simplified or traditiona
     git clone https://github.com/awisniewski21/ShengChengZi.git
     ```
 
-2. Install dependencies
+2. Install the dependencies
 
     ```bash
     pip install -r requirements.txt
     ```
 
-3. Generate the dataset(s) of Chinese characters using the notebooks in [`core/dataset`](core/dataset)
-4. Train models using the Python scripts in the repository root (see below)
-5. (WIP) Run inference on the models
+3. Generate the Chinese character datasets
+
+    ```bash
+    python gen_datasets.py
+    ```
+
+    This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts/` and the Unihan data from `data/unihan/`
+
+4. Train the models using the Python training scripts (see the [Training](#Training) section)
+5. Run inference on the trained models (see the [Evaluation](#Evaluation) section)
 
 ---
 
@@ -47,16 +54,25 @@ The repository root contains Python scripts for training different models on var
 
 ### Available Models
 
-- **Glyffuser**
-  - Random-to-Character: `python train_glyffuser_r2c.py`
-  - Text-to-Character: `python train_glyffuser_t2c.py`
-- **Palette**
-  - Character-to-Character: `python train_palette_c2c.py`
-- **ShengChengZi**
-  - Character-to-Character: `python train_scz_c2c.py`
-  - Character-to-Character (New): `python train_scz_c2c_new.py`
+- **Glyffuser** - Standard and Conditional Diffusion Models
+  - Random-to-Character: `python train_r2c_glyffuser.py`
+  - Text-to-Character: `python train_t2c_glyffuser.py`
+- **Palette** - Conditional Diffusion Model
+  - Character-to-Character: `python train_c2c_palette.py`
+- **ShengChengZi** - Conditional Diffusion Model
+  - Character-to-Character (Bidirectional): `python train_c2cbi_scz.py`
 
-All models output TensorBoard logs, checkpoints, and evaluation images to their respective output directories in `out/`.
+All models output TensorBoard logs, checkpoints, and validation images to their respective output directories.
+
+### Configuration
+
+Config options for each model are defined in `configs/`. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
+
+## Evaluation
+
+Evaluate trained Palette models with `python eval_c2c_palette.py -p /path/to/checkpoint.pt`
+
+Additional evaluation scripts for other models will be added shortly.
 
 ---
 
