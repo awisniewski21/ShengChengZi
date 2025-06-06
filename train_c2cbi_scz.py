@@ -54,6 +54,8 @@ def train_c2cbi_scz(cfg: TrainConfig_C2CBi_SCZ):
         lr_scheduler=lr_scheduler,
         noise_scheduler=noise_scheduler,
     )
+    if cfg.load_checkpoint_path is not None:
+        training_model.load_checkpoint("train")
 
     training_model.train()
 

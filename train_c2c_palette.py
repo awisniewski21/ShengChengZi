@@ -28,6 +28,8 @@ def train_c2c_palette(cfg: TrainConfig_C2C_Palette):
         optimizer=optimizer,
         lr_scheduler=None,
     )
+    if cfg.load_checkpoint_path is not None:
+        training_model.load_checkpoint("train")
 
     training_model.train()
 

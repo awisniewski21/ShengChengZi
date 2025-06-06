@@ -54,6 +54,8 @@ def train_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
         noise_scheduler=noise_scheduler,
         inference_scheduler=inference_scheduler,
     )
+    if cfg.load_checkpoint_path is not None:
+        training_model.load_checkpoint("train")
 
     training_model.train()
 

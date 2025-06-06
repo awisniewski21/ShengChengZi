@@ -49,12 +49,12 @@ class TrainModelBase(ABC):
         """
         Main training loop that handles training, evaluation, and logging
         """
-        print(f"Starting {self.config.run_name_prefix} training for {self.config.num_epochs} epochs...")
+        print(f"Starting {self.config.run_name_prefix} training from epoch {self.current_epoch} for {self.config.num_epochs - self.current_epoch} more epochs...")
 
         assert self.optimizer is not None, "Optimizer must be defined for training"
         self.writer = SummaryWriter(log_dir=str(self.log_dir))
 
-        for epoch in range(self.config.num_epochs):
+        for epoch in range(self.current_epoch, self.config.num_epochs):
             self.current_epoch = epoch
 
             # Training epoch
@@ -210,7 +210,7 @@ class TrainModelBase(ABC):
         self.config = self.config.from_dict(chkpt_config)
 
         # Load and update model state
-        self.current_epoch = chkpt_data["current_epoch"]
+        self.current_epoch = chkpt_data["current_epoch"] + 1 # Start at next epoch
         self.global_step = chkpt_data["global_step"]
         self.net.load_state_dict(chkpt_data["model_state_dict"])
         if phase.lower() == "train":
