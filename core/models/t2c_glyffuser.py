@@ -71,6 +71,28 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
 
         return eval_loss.item(), grid_img, src_texts_raw
 
+    def inference_step(self, input_data: Tuple[torch.Tensor, torch.Tensor, List[str]]) -> Tuple[torch.Tensor, List[str] | None]:
+        inference_pipeline = DiffusionPipeline_T2C_Glyff(unet=self.net, scheduler=self.inference_scheduler)
+        inference_pipeline.set_progress_bar_config(desc="Generating inference image grid...")
+
+        src_texts_embed, src_texts_mask, src_texts_raw = input_data
+        src_texts_embed = src_texts_embed.to(self.device)
+        src_texts_mask = src_texts_mask.to(self.device)
+
+        pred_imgs = inference_pipeline(
+            src_texts_embed,
+            src_texts_mask,
+            batch_size=self.config.eval_batch_size,
+            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
+            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            output_type="numpy",
+        ).images
+
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([pred_imgs_out])
+
+        return grid_img, src_texts_raw
+
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
         chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()

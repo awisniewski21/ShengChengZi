@@ -61,6 +61,22 @@ class TrainModel_C2CBi_SCZ(TrainModelBase):
 
         return eval_loss.item(), grid_img, None
 
+    def inference_step(self, input_data: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, List[str] | None]:
+        src_imgs, labels = input_data
+        src_imgs = src_imgs.to(self.device)
+        labels = labels.to(self.device)
+        bs = src_imgs.shape[0]
+
+        timesteps = torch.full((bs,), 1, device=self.device).long()
+
+        pred_imgs = self.net(src_imgs, timesteps, class_labels=labels.unsqueeze(1)).sample
+
+        src_imgs_out = to_out_img(src_imgs, (0, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([src_imgs_out, pred_imgs_out])
+
+        return grid_img, None
+
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
         chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()

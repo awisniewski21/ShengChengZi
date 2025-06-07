@@ -57,6 +57,22 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
 
         return 0, grid_img, None
 
+    def inference_step(self, input_data: None = None) -> Tuple[torch.Tensor, List[str] | None]:
+        inference_pipeline = DDPMPipeline(unet=self.net, scheduler=self.inference_scheduler)
+        inference_pipeline.set_progress_bar_config(desc="Generating inference image grid...")
+
+        pred_imgs = inference_pipeline(
+            batch_size=self.config.eval_batch_size,
+            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
+            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            output_type="numpy",
+        ).images
+
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([pred_imgs_out])
+
+        return grid_img, None
+
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
         chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()
