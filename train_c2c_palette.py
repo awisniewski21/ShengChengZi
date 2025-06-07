@@ -44,7 +44,7 @@ def train_c2c_palette(cfg: TrainConfig_C2C_Palette):
 @click.option("-tbs", "--train-batch-size",          type=int,     help="Training batch size (number of images)")
 @click.option("-ebs", "--eval-batch-size",           type=int,     help="Evaluation batch size (number of images)")
 @click.option("-lr",  "--learning-rate",             type=float,   help="Model learning rate")
-@click.option("-s",   "--seed",                      type=int,     help="Seed for random number generators")
+@click.option("-rs",  "--seed",                      type=int,     help="Seed for random number generators")
 @click.option("-si",  "--log-step-interval",         type=int,     help="Log metrics every N steps")
 @click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
 @click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")

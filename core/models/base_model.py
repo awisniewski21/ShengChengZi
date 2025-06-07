@@ -152,15 +152,36 @@ class TrainModelBase(ABC):
         """
         Run inference on the model using the test dataset and log the results
         """
-        assert self.test_dataloader is not None, "Test dataloader must be defined for testing"
+        print(f"Running {self.config.run_name_prefix} inference on the test set...")
 
-        print(f"Running {self.task_prefix} inference on the test set...")
+        assert self.test_dataloader is not None, "Test dataloader must be defined for testing"
+        self.writer = SummaryWriter(log_dir=str(self.log_dir))
 
         test_metrics = self.eval_epoch("test")
         self.log_metrics(test_metrics, self.current_epoch, "test")
         print(f"Test metrics: {test_metrics}")
 
         self.writer.close()
+
+    def inference(self, input_data):
+        """
+        Run inference on the model using the provided input data
+        """
+        print(f"Running {self.config.run_name_prefix} inference on the input data...")
+
+        self.writer = SummaryWriter(log_dir=str(self.log_dir))
+
+        self.net.eval()
+        with torch.no_grad():
+            out_grid_img, out_labels = self.inference_step(input_data)
+            self._log_image_grid(out_grid_img, "inference", 0, out_labels=out_labels)
+
+    def inference_step(self, input_data) -> Tuple[torch.Tensor, List[str] | None]:
+        """
+        Perform a single inference step on input data
+        Includes forward pass and logging output images
+        """
+        pass
 
     def get_checkpoint_data(self) -> Dict:
         """
@@ -205,6 +226,7 @@ class TrainModelBase(ABC):
         chkpt_config: Dict = chkpt_data["config"]
         chkpt_config.update({
             "run_name_prefix": self.config.run_name_prefix,
+            "load_checkpoint_path": self.config.load_checkpoint_path,
             "use_colab": self.config.use_colab,
         })
         self.config = self.config.from_dict(chkpt_config)

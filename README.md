@@ -44,7 +44,8 @@ For a given Chinese character, generate an image of its simplified or traditiona
     This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts/` and the Unihan data from `data/unihan/`
 
 4. Train the models using the Python training scripts (see the [Training](#Training) section)
-5. Run inference on the trained models (see the [Evaluation](#Evaluation) section)
+5. Evaluate the trained models on their test datasets (see the [Testing](#Testing) section)
+6. Perform inference with the pretrained models on any input (see the [Inference](#Inference) section)
 
 ---
 
@@ -55,24 +56,53 @@ The repository root contains Python scripts for training different models on var
 ### Available Models
 
 - **Glyffuser** - Standard and Conditional Diffusion Models
-  - Random-to-Character: `python train_r2c_glyffuser.py`
-  - Text-to-Character: `python train_t2c_glyffuser.py`
+  - Random-to-Character
+
+    ```bash
+    python train_r2c_glyffuser.py
+    ```
+
+  - Text-to-Character
+
+    ```bash
+    python train_t2c_glyffuser.py
+    ```
+
 - **Palette** - Conditional Diffusion Model
-  - Character-to-Character: `python train_c2c_palette.py`
+  - Character-to-Character
+
+    ```bash
+    python train_c2c_palette.py
+    ```
+
 - **ShengChengZi** - Conditional Diffusion Model
-  - Character-to-Character (Bidirectional): `python train_c2cbi_scz.py`
+  - Character-to-Character (Bidirectional)
+
+    ```bash
+    python train_c2cbi_scz.py
+    ```
 
 All models output TensorBoard logs, checkpoints, and validation images to their respective output directories.
 
 ### Configuration
 
-Config options for each model are defined in `configs/`. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
+Config options for each model are defined in the `configs` directory. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
 
-## Evaluation
+## Testing
 
-Evaluate trained Palette models with `python eval_c2c_palette.py -p /path/to/checkpoint.pt`
+To evaluate a trained model on its test dataset, run the corresponding test Python scripts and pass the pretrained model checkpoint path as input.
 
-Additional evaluation scripts for other models will be added shortly.
+```bash
+python test_*.py -p <PATH TO CHECKPOINT>
+```
+
+## Inference
+
+To perform inference with a pretrained model on any input, run the corresponding inference Python scripts and pass both the input data and the pretrained model checkpoint path as input.
+
+```bash
+python inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
+```
 
 ---
 

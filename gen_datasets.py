@@ -15,8 +15,7 @@ def main(dataset_type: str, image_size: int, font_size: int):
     Generate Chinese character datasets from Unihan data and font files
     """
     dataset_type = dataset_type.lower()
-    image_size = (image_size, image_size)
-    font_size = font_size if font_size is not None else int(100 * (image_size[0] / 128))
+    font_size = font_size if font_size is not None else int(100 * (image_size / 128))
 
     base_data_dir = Path(get_repo_dir()) / "data"
     unihan_dir = base_data_dir / "unihan"
@@ -27,8 +26,8 @@ def main(dataset_type: str, image_size: int, font_size: int):
 
     dataset_types = ["unpaired", "paired"] if dataset_type == "both" else [dataset_type]
     for data_type in dataset_types:
-        out_dir_data = out_dir / f"{data_type}_{image_size[0]}x{image_size[1]}"
-        gen_dataset(df_full, data_type, out_dir_data, font_dir, image_size, font_size)
+        out_dir_data = out_dir / f"{data_type}_{image_size}x{image_size}"
+        gen_dataset(df_full, data_type, image_size, font_dir, font_size, out_dir_data)
 
 
 if __name__ == "__main__":

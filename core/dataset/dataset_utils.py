@@ -2,7 +2,6 @@ import glob
 import os
 import re
 from pathlib import Path
-from typing import Tuple
 
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
@@ -33,10 +32,10 @@ def load_unihan_data(unihan_dir: Path) -> pd.DataFrame:
 def gen_dataset(
     df_full: pd.DataFrame,
     dataset_type: str,
-    out_dir: Path,
+    image_size: int,
     font_dir: Path,
-    image_size: Tuple[int, int],
     font_size: int,
+    out_dir: Path,
 ):
     """
     Generate dataset for all fonts
@@ -51,7 +50,7 @@ def gen_dataset(
     out_dfs_list = []
     for font_path in sorted(glob.glob(str(font_dir / "*.ttf"))):
         print(f"Generating images of characters for font '{Path(font_path).stem}'...")
-        this_out_df = gen_char_images(data_df, dataset_type, out_dir, font_path, image_size, font_size)
+        this_out_df = gen_char_images(data_df, dataset_type, image_size, font_path, font_size, out_dir)
         out_dfs_list.append(this_out_df)
 
     out_df = pd.concat(out_dfs_list, ignore_index=True)
@@ -65,10 +64,10 @@ def gen_dataset(
 def gen_char_images(
     df: pd.DataFrame,
     dataset_type: str,
-    out_dir: str | Path,
+    image_size: int,
     font_path: str | Path,
-    image_size: Tuple[int, int],
     font_size: int,
+    out_dir: str | Path,
 ):
     """
     Generate and save images for each pair of characters in the DataFrame
@@ -91,12 +90,12 @@ def gen_char_images(
             continue
 
         chars = [row["Character"]] if is_unpaired else [row["Character (S)"], row["Character (T)"]]
-        if any(not is_valid_char(c, font, image_size) for c in chars):
+        if any(not is_valid_char(c, image_size, font) for c in chars):
             invalid_ixs.append(ix)
             continue
 
         for c, f in zip(chars, filenames):
-            img = create_image(c, font, image_size)
+            img = create_image(c, image_size, font)
             img.save(f)
 
     out_df = df.drop(index=invalid_ixs)
@@ -181,21 +180,20 @@ def clean_definition(definition: str):
     return definition
 
 
-def create_image(character: str, font: ImageFont.FreeTypeFont, image_size: Tuple[int, int]):
+def create_image(character: str, image_size: int, font: ImageFont.FreeTypeFont):
     """
     Create an image of a single Unicode character
     """
-    image = Image.new("RGB", image_size, "white")
+    image = Image.new("RGB", (image_size, image_size), "white")
     draw = ImageDraw.Draw(image)
-    img_w, img_h = image_size
-    draw.text((img_w / 2, img_h * (15/32)), character, fill="black", font=font, anchor="mm")
+    draw.text((image_size / 2, image_size * (15/32)), character, fill="black", font=font, anchor="mm")
     return image
 
 
-def is_valid_char(character: str, font: ImageFont.FreeTypeFont, image_size: Tuple[int, int]):
+def is_valid_char(character: str, image_size: int, font: ImageFont.FreeTypeFont):
     """
     Check if the character is supported by the font
     """
-    image_char = create_image(character, font, image_size)
-    image_unknown = create_image("�", font, image_size) # U+FFFD (invalid character)
+    image_char = create_image(character, image_size, font)
+    image_unknown = create_image("�", image_size, font) # U+FFFD (invalid character)
     return image_char.tobytes() != image_unknown.tobytes()

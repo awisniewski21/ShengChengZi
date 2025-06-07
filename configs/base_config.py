@@ -11,7 +11,7 @@ from core.utils.repo_utils import get_repo_dir
 class TrainConfigBase:
     """ Dataset """
     task_name: str                              # Task name ("rand2char", "text2char", "char2char", or "char2char_bi")
-    image_size: int = 32                        # Image resolution
+    image_size: int = 64                        # Image resolution
 
     """ Dataset Split """
     validation_split: float | int = 16          # Validation split (0.0-1.0 or int for absolute count)

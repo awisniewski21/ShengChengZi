@@ -61,6 +61,17 @@ class TrainModel_C2C_Palette(TrainModelBase):
 
         return eval_loss.item(), grid_img, None
 
+    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None]:
+        src_imgs = input_data.to(self.device)
+
+        pred_imgs, _ = self.net.restoration(src_imgs, sample_num=self.config.sample_num)
+
+        src_imgs_out = to_out_img(src_imgs, (0, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        grid_img = make_image_grid([src_imgs_out, pred_imgs_out])
+
+        return grid_img, None
+
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
         if self.config.ema_enabled:
@@ -75,5 +86,5 @@ class TrainModel_C2C_Palette(TrainModelBase):
         if self.config.ema_enabled:
             self.net_ema.load_state_dict(chkpt_data["net_ema_state_dict"])
             self.net_ema.set_new_noise_schedule(self.device, phase)
-            if phase.lower() == "test":
+            if phase.lower() in ["test", "inference"]:
                 self.net = self.net_ema # Use EMA model for inference

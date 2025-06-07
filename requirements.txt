@@ -1,11 +1,13 @@
 diffusers
 einops
+gitpython
 matplotlib
-numpy<2.*
+numpy<2.0
 pandas
 Pillow
 rich-click
 setuptools
+tensorboard
 torch
 torchvision
 tqdm
