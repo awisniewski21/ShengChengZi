@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 
-from configs import TrainConfig_C2C_Pix2Pix
+from core.configs import TrainConfig_C2C_Pix2Pix
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 from cyclegan_and_pix2pix.networks import GANLoss, define_D, define_G

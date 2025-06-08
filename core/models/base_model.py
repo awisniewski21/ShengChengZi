@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
-from configs import TrainConfigBase
+from core.configs import TrainConfigBase
 from core.dataset.datasets import get_dataloaders
 from core.utils.train_utils import get_device
 

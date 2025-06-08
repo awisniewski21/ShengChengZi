@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 import torch
 from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel  # NOQA
 
-from configs import TrainConfig_R2C_Glyff
+from core.configs import TrainConfig_R2C_Glyff
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 

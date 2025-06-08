@@ -1,7 +1,7 @@
 # import torch
 # from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 
-# from configs import TrainConfig_C2CBi_SCZ
+# from core.configs import TrainConfig_C2CBi_SCZ
 
 
 # class TrainNetwork_C2CBi_SCZ(torch.nn.Module):

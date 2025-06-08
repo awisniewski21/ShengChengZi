@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 
-from configs import TrainConfig_C2C_Palette
+from core.configs import TrainConfig_C2C_Palette
 from palette.utils import extract, make_beta_schedule  # NOQA
 
 

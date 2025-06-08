@@ -5,7 +5,7 @@ from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, 
 from diffusers.pipelines.pipeline_utils import ImagePipelineOutput  # NOQA
 from diffusers.utils.torch_utils import randn_tensor
 
-from configs import TrainConfig_T2C_Glyff
+from core.configs import TrainConfig_T2C_Glyff
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 

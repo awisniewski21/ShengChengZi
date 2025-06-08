@@ -1,4 +1,4 @@
-![ShengChengZi Logo](ShengChengZi.png)
+![ShengChengZi Logo](shengchengzi/ShengChengZi.png)
 
 生成字 (ShēngChéngZì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
 
@@ -28,7 +28,7 @@ For a given Chinese character, generate an image of its simplified or traditiona
 3. Generate the Chinese character datasets
 
     ```bash
-    python gen_datasets.py
+    python runners/gen_datasets.py
     ```
 
     This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts` and the Unihan data from `data/unihan`
@@ -47,55 +47,55 @@ The repository root contains Python scripts for training different models on var
   - Character-to-Character (Unpaired, Bidirectional)
 
     ```bash
-    python train_c2c_cyclegan.py
+    python runners/train/train_c2c_cyclegan.py
     ```
 
 - **Glyffuser** - Standard and Conditional Diffusion Models
   - Random-to-Character
 
     ```bash
-    python train_r2c_glyffuser.py
+    python runners/train/train_r2c_glyffuser.py
     ```
 
   - Text-to-Character
 
     ```bash
-    python train_t2c_glyffuser.py
+    python runners/train/train_t2c_glyffuser.py
     ```
 
 - **Palette** - Conditional Diffusion Model
   - Character-to-Character (Paired, One-way)
 
     ```bash
-    python train_c2c_palette.py
+    python runners/train/train_c2c_palette.py
     ```
 
 - **Pix2Pix** - Conditional GAN
   - Character-to-Character (Paired, One-way)
 
     ```bash
-    python train_c2c_pix2pix.py
+    python runners/train/train_c2c_pix2pix.py
     ```
 
 - **ShengChengZi** - Conditional Diffusion Model
   - Character-to-Character (Paired, Bidirectional)
 
     ```bash
-    python train_c2cbi_scz.py
+    python runners/train/train_c2cbi_scz.py
     ```
 
 All models output TensorBoard logs, checkpoints, and validation images to their respective output directories.
 
 ### Configuration
 
-Config options for each model are defined in the `configs` directory. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
+Config options for each model are defined in the `core/configs` directory. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
 
 ## Testing
 
 To evaluate a trained model on its test dataset, run the corresponding test Python scripts and pass the pretrained model checkpoint path as input.
 
 ```bash
-python test_*.py -p <PATH TO CHECKPOINT>
+python runners/test/test_*.py -p <PATH TO CHECKPOINT>
 ```
 
 ## Inference
@@ -103,7 +103,7 @@ python test_*.py -p <PATH TO CHECKPOINT>
 To perform inference with a pretrained model on any input, run the corresponding inference Python scripts and pass both the input data and the pretrained model checkpoint path as input.
 
 ```bash
-python inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
+python runners/inference/inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
 ```
 
 ## Acknowledgements

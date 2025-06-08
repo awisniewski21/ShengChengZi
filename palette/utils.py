@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 import torch
 
-from configs import TrainConfig_C2C_Palette
+from core.configs import TrainConfig_C2C_Palette
 
 
 def make_beta_schedule(config: TrainConfig_C2C_Palette, phase: str = "train", cosine_s: float = 8e-3):

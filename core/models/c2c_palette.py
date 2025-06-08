@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from configs import TrainConfig_C2C_Palette
+from core.configs import TrainConfig_C2C_Palette
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 from palette.palette_network import PaletteNetwork

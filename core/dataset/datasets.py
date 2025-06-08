@@ -12,7 +12,7 @@ from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from configs import TrainConfigBase
+from core.configs import TrainConfigBase
 from glyffuser import t5
 
 

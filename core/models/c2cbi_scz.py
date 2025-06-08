@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 import torch
 from diffusers import DDPMScheduler, UNet2DModel
 
-from configs import TrainConfig_C2CBi_SCZ
+from core.configs import TrainConfig_C2CBi_SCZ
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 
