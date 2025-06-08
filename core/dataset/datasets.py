@@ -12,7 +12,7 @@ from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
-from configs import TrainConfigBase
+from core.configs import TrainConfigBase
 from glyffuser import t5
 
 
@@ -119,17 +119,17 @@ class PairedBidirectionalImageDataset(PairedImageDataset):
 
 
 class ImageCollator:
-    def __init__(self, task_name: str):
-        self.task_name = task_name
+    def __init__(self, dataset_task: str):
+        self.dataset_task = dataset_task
 
     def __call__(self, batch_samples: List):
-        if self.task_name == "text2char":
+        if self.dataset_task == "text2char":
             images, texts_embed, texts_mask, raw_texts = zip(*batch_samples)
             texts_embed = pad_sequence(texts_embed, True)
             texts_mask = pad_sequence(texts_mask, True)
             batched_samples = list(zip(images, texts_embed, texts_mask, raw_texts))
             return default_collate(batched_samples)
-        elif self.task_name == "char2char":
+        elif self.dataset_task == "char2char":
             return default_collate(batch_samples)
         else:
             return default_collate(batch_samples)
@@ -142,22 +142,22 @@ def get_dataset(cfg: TrainConfigBase, *args, **kwargs) -> Dataset:
         transforms.ToTensor(),
     ])
 
-    cfg.task_name = cfg.task_name.lower()
-    if cfg.task_name == "rand2char":
+    cfg.dataset_task = cfg.dataset_task.lower()
+    if cfg.dataset_task == "rand2char":
         full_dataset = UnpairedImageDataset(*args, transform=transform, **kwargs)
-    elif cfg.task_name == "text2char":
+    elif cfg.dataset_task == "text2char":
         full_dataset = UnpairedCaptionedImageDataset(*args, transform=transform, **kwargs)
-    elif cfg.task_name == "char2char":
+    elif cfg.dataset_task == "char2char":
         full_dataset = PairedImageDataset(*args, transform=transform, **kwargs)
-    elif cfg.task_name == "char2char_bi":
+    elif cfg.dataset_task == "char2char_bi":
         full_dataset = PairedBidirectionalImageDataset(*args, transform=transform, **kwargs)
     else:
-        raise ValueError(f"Unknown task name: '{cfg.task_name}'")
+        raise ValueError(f"Unknown dataset task name: '{cfg.dataset_task}'")
 
     return full_dataset
 
 
-def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = None, **kwargs) -> Tuple[DataLoader, DataLoader | None, DataLoader | None]:
+def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = None, verbose: bool = True, **kwargs) -> Tuple[DataLoader, DataLoader | None, DataLoader | None]:
     """
     Get train, validation, and test dataloaders for the given task's dataset
     """
@@ -166,18 +166,19 @@ def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = 
 
     train_dataset, val_dataset, test_dataset = split_dataset(full_dataset, cfg)
 
-    collate_fn = ImageCollator(cfg.task_name)
+    collate_fn = ImageCollator(cfg.dataset_task)
 
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.train_batch_size, shuffle=True, collate_fn=collate_fn)
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if val_dataset is not None else None
     test_dataloader = DataLoader(test_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if test_dataset is not None else None
 
-    print("Dataset split:")
-    print(f"    Train: {len(train_dataset)} images ({len(train_dataloader)} batches)")
-    if val_dataset is not None:
-        print(f"    Val: {len(val_dataset)} images ({len(val_dataloader)} batches)")
-    if test_dataset is not None:
-        print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
+    if verbose:
+        print("Dataset split:")
+        print(f"    Train: {len(train_dataset)} images ({len(train_dataloader)} batches)")
+        if val_dataset is not None:
+            print(f"    Val: {len(val_dataset)} images ({len(val_dataloader)} batches)")
+        if test_dataset is not None:
+            print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
 
     return train_dataloader, val_dataloader, test_dataloader
 

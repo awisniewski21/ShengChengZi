@@ -6,7 +6,7 @@
 # from torch.utils.data import DataLoader
 # from tqdm import tqdm
 
-# from configs import TrainConfig_C2CBi_SCZ
+# from core.configs import TrainConfig_C2CBi_SCZ
 
 
 # def make_1step_sched(device: str):

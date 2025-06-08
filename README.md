@@ -1,4 +1,4 @@
-![ShengChengZi Logo](ShengChengZi.png)
+![ShengChengZi Logo](shengchengzi/ShengChengZi.png)
 
 生成字 (ShēngChéngZì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
 
@@ -28,10 +28,10 @@ For a given Chinese character, generate an image of its simplified or traditiona
 3. Generate the Chinese character datasets
 
     ```bash
-    python gen_datasets.py
+    python runners/gen_datasets.py
     ```
 
-    This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts/` and the Unihan data from `data/unihan/`
+    This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts` and the Unihan data from `data/unihan`
 
 4. Train the models using the Python training scripts (see the [Training](#Training) section)
 5. Evaluate the trained models on their test datasets (see the [Testing](#Testing) section)
@@ -43,45 +43,59 @@ The repository root contains Python scripts for training different models on var
 
 ### Available Models
 
+- **CycleGAN** - Conditional GAN
+  - Character-to-Character (Unpaired, Bidirectional)
+
+    ```bash
+    python runners/train/train_c2cbi_cyclegan.py
+    ```
+
 - **Glyffuser** - Standard and Conditional Diffusion Models
   - Random-to-Character
 
     ```bash
-    python train_r2c_glyffuser.py
+    python runners/train/train_r2c_glyffuser.py
     ```
 
   - Text-to-Character
 
     ```bash
-    python train_t2c_glyffuser.py
+    python runners/train/train_t2c_glyffuser.py
     ```
 
 - **Palette** - Conditional Diffusion Model
-  - Character-to-Character
+  - Character-to-Character (Paired, One-way)
 
     ```bash
-    python train_c2c_palette.py
+    python runners/train/train_c2c_palette.py
+    ```
+
+- **Pix2Pix** - Conditional GAN
+  - Character-to-Character (Paired, One-way)
+
+    ```bash
+    python runners/train/train_c2c_pix2pix.py
     ```
 
 - **ShengChengZi** - Conditional Diffusion Model
-  - Character-to-Character (Bidirectional)
+  - Character-to-Character (Paired, Bidirectional)
 
     ```bash
-    python train_c2cbi_scz.py
+    python runners/train/train_c2cbi_scz.py
     ```
 
 All models output TensorBoard logs, checkpoints, and validation images to their respective output directories.
 
 ### Configuration
 
-Config options for each model are defined in the `configs` directory. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
+Config options for each model are defined in the `core/configs` directory. All training scripts accept CLI arguments to override the default config values. Run them with `--help` to see a full list of options.
 
 ## Testing
 
 To evaluate a trained model on its test dataset, run the corresponding test Python scripts and pass the pretrained model checkpoint path as input.
 
 ```bash
-python test_*.py -p <PATH TO CHECKPOINT>
+python runners/test/test_*.py -p <PATH TO CHECKPOINT>
 ```
 
 ## Inference
@@ -89,11 +103,17 @@ python test_*.py -p <PATH TO CHECKPOINT>
 To perform inference with a pretrained model on any input, run the corresponding inference Python scripts and pass both the input data and the pretrained model checkpoint path as input.
 
 ```bash
-python inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
+python runners/inference/inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
 ```
 
 ## Acknowledgements
 
-The `glyffuser` model and code is based upon the [article](https://yue-here.com/posts/glyffuser/) and [repo](https://github.com/yue-here/glyffuser/tree/main) by Yue Wu.
+The `cyclegan` model is based upon the [paper](https://arxiv.org/abs/1703.10593) and [repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) by Jun-Yan Zhu et al.
 
-The `palette` model and code is based upon the [paper](https://doi.org/10.1145/3528233.353075) and [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Chitwan Saharia et al.
+The `glyffuser` model is based upon the [article](https://yue-here.com/posts/glyffuser/) and [repo](https://github.com/yue-here/glyffuser/tree/main) by Yue Wu.
+
+The `palette` model is based upon the [paper](https://arxiv.org/pdf/2111.05826) by Chitwan Saharia et al. and the [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Liangwei Jiang et al.
+
+The `pix2pix` model is based upon the [paper](https://arxiv.org/pdf/1611.07004) by Phillip Isola et al. and the [repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) by Jun-Yan Zhu et al.
+
+The `unihan` dataset is based upon the [website](https://www.unicode.org/charts/unihan.html) and [repo](https://github.com/unicode-org/unihan-database) provided by Unicode, Inc.
