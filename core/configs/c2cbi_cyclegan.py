@@ -6,14 +6,14 @@ from core.configs import TrainConfigBase
 @dataclass
 class TrainConfig_C2CBi_CycleGAN(TrainConfigBase):
     """ Dataset """
-    task_name: str = "char2char"                  # Task name (NOTE: Use char2char dataset since we train both directions simultaneously)
+    dataset_task: str = "char2char"               # Dataset task name (NOTE: Use char2char since we train both directions simultaneously)
 
     """ Training Params """
     run_name_prefix: str = "train_c2cbi_cyclegan" # Prefix for run names
 
     """ Model Params """
     # Network Architecture
-    netG: str = "resnet_9blocks"                  # Generator architecture
+    netG: str = "resnet_6blocks"                  # Generator architecture
     netD: str = "basic"                           # Discriminator architecture
     ngf: int = 64                                 # Generator filters in last conv layer
     ndf: int = 64                                 # Discriminator filters in first conv layer

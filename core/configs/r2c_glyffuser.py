@@ -6,7 +6,7 @@ from core.configs import TrainConfigBase
 @dataclass
 class TrainConfig_R2C_Glyff(TrainConfigBase):
     """ Model Params """
-    task_name: str = "rand2char"                # Task name
+    dataset_task: str = "rand2char"             # Dataset task name
     
     """ Training Params """
     run_name_prefix: str = "train_r2c_glyff"    # Prefix for run names

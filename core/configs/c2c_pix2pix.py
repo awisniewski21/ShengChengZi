@@ -6,7 +6,7 @@ from core.configs import TrainConfigBase
 @dataclass
 class TrainConfig_C2C_Pix2Pix(TrainConfigBase):
     """ Dataset """
-    task_name: str = "char2char"                # Task name
+    dataset_task: str = "char2char"             # Dataset task name
 
     """ Training Params """
     run_name_prefix: str = "train_c2c_pix2pix"  # Prefix for run names

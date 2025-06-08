@@ -10,7 +10,7 @@ from core.utils.repo_utils import get_repo_dir
 @dataclass
 class TrainConfigBase:
     """ Dataset """
-    task_name: str                              # Task name ("rand2char", "text2char", "char2char", or "char2char_bi")
+    dataset_task: str                           # Dataset task name ("rand2char", "text2char", "char2char", or "char2char_bi")
     image_size: int = 64                        # Image resolution
 
     """ Dataset Split """
@@ -48,7 +48,7 @@ class TrainConfigBase:
     def root_image_dir(self) -> Path:
         """ Get the root image directory path """
         base_data_dir = get_repo_dir() / "data" if not self.use_colab else Path("/content")
-        dataset_type = "paired" if self.task_name in ["char2char", "char2char_bi"] else "unpaired"
+        dataset_type = "paired" if self.dataset_task in ["char2char", "char2char_bi"] else "unpaired"
         return base_data_dir / "datasets" / f"{dataset_type}_{self.image_size}x{self.image_size}"
 
     @property

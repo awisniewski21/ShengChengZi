@@ -6,7 +6,7 @@ from core.configs import TrainConfigBase
 @dataclass
 class TrainConfig_T2C_Glyff(TrainConfigBase):
     """ Model Params """
-    task_name: str = "text2char"                # Task name
+    dataset_task: str = "text2char"             # Dataset task name
     text_encoder: str = "google-t5/t5-small"    # Text encoder model name
     encoder_dim: int = 1024                     # Encoder dimensions
 
