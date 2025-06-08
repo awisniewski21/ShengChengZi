@@ -1,33 +1,40 @@
 import rich_click as click
 import torch
 
-from configs import TrainConfig_C2C_Palette
-from core.models import TrainModel_C2C_Palette
-from palette.palette_network import PaletteNetwork
+from configs import TrainConfig_C2C_Pix2Pix
+from core.models.c2c_pix2pix import Pix2PixNetwork, TrainModel_C2C_Pix2Pix
 
 
-def train_c2c_palette(cfg: TrainConfig_C2C_Palette):
-    print(f"Starting Char2Char training with Palette model:")
+def train_c2c_pix2pix(cfg: TrainConfig_C2C_Pix2Pix):
+    print(f"Starting Char2Char training with Pix2Pix model:")
     print(f"    Dataset: {cfg.root_image_dir.name}")
     print(f"    Image size: {cfg.image_size}")
     print(f"    Batch size: {cfg.train_batch_size}")
     print(f"    Epochs: {cfg.num_epochs}")
     print(f"    Learning rate: {cfg.learning_rate}")
 
-    net = PaletteNetwork(config=cfg)
-    net.init_weights()
+    # Create the composite network
+    net = Pix2PixNetwork(cfg)
 
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f"Trainable network parameters: {total_params:,}")
 
-    optimizer = torch.optim.AdamW(net.parameters(), lr=cfg.learning_rate)
+    # Create optimizers for generator and discriminator
+    optimizer_G = torch.optim.Adam(
+        net.netG.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999)
+    )
+    optimizer_D = torch.optim.Adam(
+        net.netD.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999)
+    )
 
-    training_model = TrainModel_C2C_Palette(
+    training_model = TrainModel_C2C_Pix2Pix(
         config=cfg,
         net=net,
-        optimizer=optimizer,
+        optimizer=optimizer_G,  # Generator optimizer goes to base class
         lr_scheduler=None,
+        optimizer_D=optimizer_D,  # Discriminator optimizer goes separately
     )
+
     if cfg.load_checkpoint_path is not None:
         training_model.load_checkpoint("train")
 
@@ -49,10 +56,15 @@ def train_c2c_palette(cfg: TrainConfig_C2C_Palette):
 @click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
 @click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")
 @click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
+@click.option("-p",   "--load-checkpoint-path",      type=str,     help="Path to load model checkpoint from")
+@click.option("--lambda-l1",                         type=float,   help="Weight for L1 loss")
+@click.option("--netg",                              type=str,     help="Generator architecture")
+@click.option("--netd",                              type=str,     help="Discriminator architecture")
+@click.option("--gan-mode",                          type=str,     help="GAN loss type")
 def main(**kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
-    cfg = TrainConfig_C2C_Palette(**filtered_kwargs)
-    return train_c2c_palette(cfg)
+    cfg = TrainConfig_C2C_Pix2Pix(**filtered_kwargs)
+    return train_c2c_pix2pix(cfg)
 
 
 if __name__ == "__main__":

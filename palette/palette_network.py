@@ -7,7 +7,7 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 from configs import TrainConfig_C2C_Palette
-from palette.models.utils import extract, make_beta_schedule  # NOQA
+from palette.utils import extract, make_beta_schedule  # NOQA
 
 
 class PaletteNetwork(nn.Module):

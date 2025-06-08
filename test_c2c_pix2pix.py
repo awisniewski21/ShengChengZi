@@ -1,20 +1,21 @@
 import rich_click as click
 
-from configs import TrainConfig_C2C_Palette
-from core.models.c2c_palette import TrainModel_C2C_Palette
-from palette.palette_network import PaletteNetwork
+from configs import TrainConfig_C2C_Pix2Pix
+from core.models.c2c_pix2pix import TrainModel_C2C_Pix2Pix, Pix2PixNetwork
 
 
-def test_c2c_palette(cfg: TrainConfig_C2C_Palette):
+def test_c2c_pix2pix(cfg: TrainConfig_C2C_Pix2Pix):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for evaluation"
 
-    net = PaletteNetwork(config=cfg)
+    # Create the composite network
+    net = Pix2PixNetwork(cfg)
 
-    model = TrainModel_C2C_Palette(
+    model = TrainModel_C2C_Pix2Pix(
         config=cfg,
         net=net,
         optimizer=None,
         lr_scheduler=None,
+        optimizer_D=None,
     )
     model.load_checkpoint("test")
 
@@ -25,11 +26,11 @@ def test_c2c_palette(cfg: TrainConfig_C2C_Palette):
 
 @click.command()
 @click.option("-p", "--load-checkpoint-path", type=str, required=True,              help="Path to the checkpoint file")
-@click.option("-r", "--run-name-prefix",      type=str, default="test_c2c_palette", help="Run name prefix for logging")
+@click.option("-r", "--run-name-prefix",      type=str, default="test_c2c_pix2pix", help="Run name prefix for logging")
 @click.option("-c", "--use-colab",            is_flag=True,                         help="Use Google Colab environment paths")
 def main(*args, **kwargs):
-    cfg = TrainConfig_C2C_Palette(*args, **kwargs)
-    return test_c2c_palette(cfg)
+    cfg = TrainConfig_C2C_Pix2Pix(*args, **kwargs)
+    return test_c2c_pix2pix(cfg)
 
 
 if __name__ == "__main__":

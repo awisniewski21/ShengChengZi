@@ -5,7 +5,7 @@ import rich_click as click
 from configs import TrainConfig_C2C_Palette
 from core.models.c2c_palette import TrainModel_C2C_Palette
 from core.utils.image_utils import chars_to_image_tensor
-from palette.models.palette_network import PaletteNetwork
+from palette.palette_network import PaletteNetwork
 
 
 def inference_c2c_palette(

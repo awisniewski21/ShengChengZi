@@ -31,7 +31,7 @@ For a given Chinese character, generate an image of its simplified or traditiona
     python gen_datasets.py
     ```
 
-    This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts/` and the Unihan data from `data/unihan/`
+    This will generate both paired and unpaired datasets of 64x64 images using the fonts in `data/fonts` and the Unihan data from `data/unihan`
 
 4. Train the models using the Python training scripts (see the [Training](#Training) section)
 5. Evaluate the trained models on their test datasets (see the [Testing](#Testing) section)
