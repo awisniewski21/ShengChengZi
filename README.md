@@ -43,6 +43,13 @@ The repository root contains Python scripts for training different models on var
 
 ### Available Models
 
+- **CycleGAN** - Conditional GAN
+  - Character-to-Character (Unpaired, Bidirectional)
+
+    ```bash
+    python train_c2c_cyclegan.py
+    ```
+
 - **Glyffuser** - Standard and Conditional Diffusion Models
   - Random-to-Character
 
@@ -57,14 +64,21 @@ The repository root contains Python scripts for training different models on var
     ```
 
 - **Palette** - Conditional Diffusion Model
-  - Character-to-Character
+  - Character-to-Character (Paired, One-way)
 
     ```bash
     python train_c2c_palette.py
     ```
 
+- **Pix2Pix** - Conditional GAN
+  - Character-to-Character (Paired, One-way)
+
+    ```bash
+    python train_c2c_pix2pix.py
+    ```
+
 - **ShengChengZi** - Conditional Diffusion Model
-  - Character-to-Character (Bidirectional)
+  - Character-to-Character (Paired, Bidirectional)
 
     ```bash
     python train_c2cbi_scz.py
@@ -94,6 +108,10 @@ python inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
 
 ## Acknowledgements
 
-The `glyffuser` model and code is based upon the [article](https://yue-here.com/posts/glyffuser/) and [repo](https://github.com/yue-here/glyffuser/tree/main) by Yue Wu.
+The `cyclegan` model is based upon the [paper](https://arxiv.org/abs/1703.10593) and [repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) by Jun-Yan Zhu et al.
 
-The `palette` model and code is based upon the [paper](https://doi.org/10.1145/3528233.353075) and [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Chitwan Saharia et al.
+The `glyffuser` model is based upon the [article](https://yue-here.com/posts/glyffuser/) and [repo](https://github.com/yue-here/glyffuser/tree/main) by Yue Wu.
+
+The `palette` model is based upon the [paper](https://arxiv.org/pdf/2111.05826) by Chitwan Saharia et al. and the [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Liangwei Jiang et al.
+
+The `pix2pix` model is based upon the [paper](https://arxiv.org/pdf/1611.07004) by Phillip Isola et al. and the [repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) by Jun-Yan Zhu et al.
