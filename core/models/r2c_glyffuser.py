@@ -75,11 +75,11 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
-        chkpt_data["noise_scheduler_state"] = self.noise_scheduler.state_dict()
-        chkpt_data["inference_scheduler_state"] = self.inference_scheduler.state_dict()
+        chkpt_data["noise_scheduler_state"] = self.noise_scheduler
+        chkpt_data["inference_scheduler_state"] = self.inference_scheduler
         return chkpt_data
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
-        super().load_checkpoint_data(chkpt_data)
-        self.noise_scheduler.load_state_dict(chkpt_data["noise_scheduler_state"])
-        self.inference_scheduler.load_state_dict(chkpt_data["inference_scheduler_state"])
+        super().load_checkpoint_data(chkpt_data, phase)
+        self.noise_scheduler = chkpt_data["noise_scheduler_state"]
+        self.inference_scheduler = chkpt_data["inference_scheduler_state"]

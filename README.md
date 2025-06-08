@@ -1,12 +1,4 @@
-# 生成字 (ShēngChéngZì)
-
-| EN | Generative AI for Chinese Characters |
-| --- | --- |
-| ZH | 汉字的生成式人工智能 |
-
----
-
-## Overview
+![ShengChengZi Logo](ShengChengZi.png)
 
 生成字 (ShēngChéngZì) is a Generative AI toolkit for various tasks involving Chinese characters, including:
 
@@ -18,8 +10,6 @@ For a given text prompt, generate an image of a Chinese character.
 
 - **Character-to-Character (C2C)**  
 For a given Chinese character, generate an image of its simplified or traditional variant.
-
----
 
 ## Getting Started
 
@@ -46,8 +36,6 @@ For a given Chinese character, generate an image of its simplified or traditiona
 4. Train the models using the Python training scripts (see the [Training](#Training) section)
 5. Evaluate the trained models on their test datasets (see the [Testing](#Testing) section)
 6. Perform inference with the pretrained models on any input (see the [Inference](#Inference) section)
-
----
 
 ## Training
 
@@ -103,8 +91,6 @@ To perform inference with a pretrained model on any input, run the corresponding
 ```bash
 python inference_*.py <INPUT DATA> -p <PATH TO CHECKPOINT>
 ```
-
----
 
 ## Acknowledgements
 
