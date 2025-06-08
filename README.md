@@ -47,7 +47,7 @@ The repository root contains Python scripts for training different models on var
   - Character-to-Character (Unpaired, Bidirectional)
 
     ```bash
-    python runners/train/train_c2c_cyclegan.py
+    python runners/train/train_c2cbi_cyclegan.py
     ```
 
 - **Glyffuser** - Standard and Conditional Diffusion Models

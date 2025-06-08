@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 
-from core.configs import TrainConfig_C2C_CycleGAN
+from core.configs import TrainConfig_C2CBi_CycleGAN
 from core.models import TrainModelBase
 from core.utils.image_utils import make_image_grid, to_out_img
 from cyclegan_and_pix2pix.image_pool import ImagePool
@@ -14,7 +14,7 @@ class CycleGANNetwork(nn.Module):
     """
     CycleGAN network wrapper that contains all sub-networks
     """
-    def __init__(self, config: TrainConfig_C2C_CycleGAN):
+    def __init__(self, config: TrainConfig_C2CBi_CycleGAN):
         super().__init__()
         self.config = config
         
@@ -47,12 +47,12 @@ class CycleGANNetwork(nn.Module):
         return x
 
 
-class TrainModel_C2C_CycleGAN(TrainModelBase):
+class TrainModel_C2CBi_CycleGAN(TrainModelBase):
     """
     CycleGAN model for Character-to-Character (C2C) training
     Adapted from pytorch-CycleGAN-and-pix2pix implementation
     """
-    config: TrainConfig_C2C_CycleGAN
+    config: TrainConfig_C2CBi_CycleGAN
     net: CycleGANNetwork
     
     def __init__(self, *, optimizer_D: torch.optim.Optimizer, lr_scheduler_D=None, **kwargs):

@@ -3,11 +3,11 @@ import itertools
 import rich_click as click
 import torch
 
-from core.configs import TrainConfig_C2C_CycleGAN
-from core.models.c2c_cyclegan import CycleGANNetwork, TrainModel_C2C_CycleGAN
+from core.configs import TrainConfig_C2CBi_CycleGAN
+from core.models.c2cbi_cyclegan import CycleGANNetwork, TrainModel_C2CBi_CycleGAN
 
 
-def train_c2c_cyclegan(cfg: TrainConfig_C2C_CycleGAN):
+def train_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
     print(f"Starting Char2Char training with CycleGAN model:")
     print(f"    Dataset: {cfg.root_image_dir.name}")
     print(f"    Image size: {cfg.image_size}")
@@ -31,7 +31,7 @@ def train_c2c_cyclegan(cfg: TrainConfig_C2C_CycleGAN):
         lr=cfg.learning_rate, betas=(0.5, 0.999)
     )
 
-    training_model = TrainModel_C2C_CycleGAN(
+    training_model = TrainModel_C2CBi_CycleGAN(
         config=cfg,
         net=net,
         optimizer=optimizer_G,  # Generator optimizer goes to base class
@@ -69,8 +69,8 @@ def train_c2c_cyclegan(cfg: TrainConfig_C2C_CycleGAN):
 @click.option("--gan-mode",                          type=str,     help="GAN loss type")
 def main(**kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
-    cfg = TrainConfig_C2C_CycleGAN(**filtered_kwargs)
-    return train_c2c_cyclegan(cfg)
+    cfg = TrainConfig_C2CBi_CycleGAN(**filtered_kwargs)
+    return train_c2cbi_cyclegan(cfg)
 
 
 if __name__ == "__main__":

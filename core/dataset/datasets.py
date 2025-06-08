@@ -157,7 +157,7 @@ def get_dataset(cfg: TrainConfigBase, *args, **kwargs) -> Dataset:
     return full_dataset
 
 
-def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = None, **kwargs) -> Tuple[DataLoader, DataLoader | None, DataLoader | None]:
+def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = None, verbose: bool = True, **kwargs) -> Tuple[DataLoader, DataLoader | None, DataLoader | None]:
     """
     Get train, validation, and test dataloaders for the given task's dataset
     """
@@ -172,12 +172,13 @@ def get_dataloaders(cfg: TrainConfigBase, *args, full_dataset: Dataset | None = 
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if val_dataset is not None else None
     test_dataloader = DataLoader(test_dataset, batch_size=cfg.eval_batch_size, shuffle=False, collate_fn=collate_fn) if test_dataset is not None else None
 
-    print("Dataset split:")
-    print(f"    Train: {len(train_dataset)} images ({len(train_dataloader)} batches)")
-    if val_dataset is not None:
-        print(f"    Val: {len(val_dataset)} images ({len(val_dataloader)} batches)")
-    if test_dataset is not None:
-        print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
+    if verbose:
+        print("Dataset split:")
+        print(f"    Train: {len(train_dataset)} images ({len(train_dataloader)} batches)")
+        if val_dataset is not None:
+            print(f"    Val: {len(val_dataset)} images ({len(val_dataloader)} batches)")
+        if test_dataset is not None:
+            print(f"    Test: {len(test_dataset)} images ({len(test_dataloader)} batches)")
 
     return train_dataloader, val_dataloader, test_dataloader
 

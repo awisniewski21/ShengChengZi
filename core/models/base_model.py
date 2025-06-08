@@ -43,6 +43,7 @@ class TrainModelBase(ABC):
             self.config, 
             root_image_dir=self.config.root_image_dir, 
             metadata_path=self.config.image_metadata_path,
+            verbose=self.config.load_checkpoint_path is None,
         )
 
     def train(self):

@@ -22,6 +22,7 @@ def train_t2c_glyffuser(cfg: TrainConfig_T2C_Glyff):
         cfg, 
         root_image_dir=cfg.root_image_dir, 
         metadata_path=cfg.image_metadata_path,
+        verbose=False,
     )
 
     net = UNet2DConditionModel(

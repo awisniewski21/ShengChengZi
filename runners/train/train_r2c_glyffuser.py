@@ -22,6 +22,7 @@ def train_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
         cfg, 
         root_image_dir=cfg.root_image_dir, 
         metadata_path=cfg.image_metadata_path,
+        verbose=False,
     )
 
     net = UNet2DModel(
