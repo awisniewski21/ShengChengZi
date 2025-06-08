@@ -115,3 +115,5 @@ The `glyffuser` model is based upon the [article](https://yue-here.com/posts/gly
 The `palette` model is based upon the [paper](https://arxiv.org/pdf/2111.05826) by Chitwan Saharia et al. and the [repo](https://github.com/Janspiry/Palette-Image-to-Image-Diffusion-Models) by Liangwei Jiang et al.
 
 The `pix2pix` model is based upon the [paper](https://arxiv.org/pdf/1611.07004) by Phillip Isola et al. and the [repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) by Jun-Yan Zhu et al.
+
+The `unihan` dataset is based upon the [website](https://www.unicode.org/charts/unihan.html) and [repo](https://github.com/unicode-org/unihan-database) provided by Unicode, Inc.
