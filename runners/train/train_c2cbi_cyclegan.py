@@ -8,20 +8,18 @@ from core.models.c2cbi_cyclegan import CycleGANNetwork, TrainModel_C2CBi_CycleGA
 
 
 def train_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
-    print(f"Starting Char2Char training with CycleGAN model:")
+    print(f"Starting Char2CharBi training with CycleGAN model:")
     print(f"    Dataset: {cfg.root_image_dir.name}")
     print(f"    Image size: {cfg.image_size}")
     print(f"    Batch size: {cfg.train_batch_size}")
     print(f"    Epochs: {cfg.num_epochs}")
     print(f"    Learning rate: {cfg.learning_rate}")
 
-    # Create the composite network
     net = CycleGANNetwork(cfg)
 
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f"Trainable network parameters: {total_params:,}")
 
-    # Create optimizers for generators and discriminators
     optimizer_G = torch.optim.Adam(
         itertools.chain(net.netG_A.parameters(), net.netG_B.parameters()), 
         lr=cfg.learning_rate, betas=(0.5, 0.999)
@@ -34,11 +32,10 @@ def train_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
     training_model = TrainModel_C2CBi_CycleGAN(
         config=cfg,
         net=net,
-        optimizer=optimizer_G,  # Generator optimizer goes to base class
+        optimizer=optimizer_G,
         lr_scheduler=None,
-        optimizer_D=optimizer_D,  # Discriminator optimizer goes separately
+        optimizer_D=optimizer_D,
     )
-
     if cfg.load_checkpoint_path is not None:
         training_model.load_checkpoint("train")
 
@@ -55,18 +52,12 @@ def train_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
 @click.option("-tbs", "--train-batch-size",          type=int,     help="Training batch size (number of images)")
 @click.option("-ebs", "--eval-batch-size",           type=int,     help="Evaluation batch size (number of images)")
 @click.option("-lr",  "--learning-rate",             type=float,   help="Model learning rate")
+@click.option("-p",   "--load-checkpoint-path",      type=float,   help="Optional path to load model checkpoint from")
 @click.option("-rs",  "--seed",                      type=int,     help="Seed for random number generators")
+@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
 @click.option("-si",  "--log-step-interval",         type=int,     help="Log metrics every N steps")
 @click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
 @click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")
-@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
-@click.option("-p",   "--load-checkpoint-path",      type=str,     help="Path to load model checkpoint from")
-@click.option("--lambda-a",                          type=float,   help="Weight for cycle loss (A -> B -> A)")
-@click.option("--lambda-b",                          type=float,   help="Weight for cycle loss (B -> A -> B)")
-@click.option("--lambda-identity",                   type=float,   help="Weight for identity mapping loss")
-@click.option("--netg",                              type=str,     help="Generator architecture")
-@click.option("--netd",                              type=str,     help="Discriminator architecture")
-@click.option("--gan-mode",                          type=str,     help="GAN loss type")
 def main(**kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
     cfg = TrainConfig_C2CBi_CycleGAN(**filtered_kwargs)

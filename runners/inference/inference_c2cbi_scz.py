@@ -12,7 +12,7 @@ from core.utils.image_utils import chars_to_image_tensor
 def inference_c2cbi_scz(
     cfg: TrainConfig_C2CBi_SCZ,
     input_chars: Sequence[str],
-    direction: int = 0,  # 0 for source->target, 1 for target->source
+    direction: int = 0,
     font_name: str = "NotoSansSC-Regular",
     font_size: int | None = None,
 ):
@@ -50,12 +50,12 @@ def inference_c2cbi_scz(
 
 @click.command()
 @click.argument(    "input_chars",            type=str, required=True, nargs=-1)
-@click.option("-p", "--load-checkpoint-path", type=str, required=True,                     help="Path to the checkpoint file")
-@click.option("-r", "--run-name-prefix",      type=str, default="inference_c2cbi_scz",     help="Run name prefix for logging")
-@click.option("-c", "--use-colab",            is_flag=True,                                help="Use Google Colab environment paths")
-@click.option("-d", "--direction",            type=int, default=0,                         help="Direction: 0 for source->target, 1 for target->source")
-@click.option("-f", "--font-name",            type=str, default="NotoSansSC-Regular",      help="Font name for character rendering")
-@click.option("-s", "--font-size",            type=int, default=None,                      help="Font size for character rendering (None to auto-scale)")
+@click.option("-p", "--load-checkpoint-path", type=str, required=True,                 help="Path to the checkpoint file")
+@click.option("-r", "--run-name-prefix",      type=str, default="inference_c2cbi_scz", help="Run name prefix for logging")
+@click.option("-c", "--use-colab",            is_flag=True,                            help="Use Google Colab environment paths")
+@click.option("-d", "--direction",            type=int, default=0,                     help="Generation direction (0 for src->trg or 1 for trg->src)")
+@click.option("-f", "--font-name",            type=str, default="NotoSansSC-Regular",  help="Font name for character rendering")
+@click.option("-s", "--font-size",            type=int, default=None,                  help="Font size for character rendering (None to auto-scale)")
 def main(*args, input_chars: Sequence[str], direction: int, font_name: str, font_size: int | None, **kwargs):
     cfg = TrainConfig_C2CBi_SCZ(*args, **kwargs)
     return inference_c2cbi_scz(cfg, input_chars, direction=direction, font_name=font_name, font_size=font_size)

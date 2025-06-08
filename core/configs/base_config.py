@@ -32,7 +32,7 @@ class TrainConfigBase:
     """ Logging """
     log_step_interval: int = 1                  # Log step metrics every N steps
     eval_epoch_interval: int = 1                # Run validation every N epochs
-    checkpoint_epoch_interval: int = 50         # Save model checkpoints every N epochs
+    checkpoint_epoch_interval: int = 0          # Save model checkpoints every N epochs (0 to disable)
 
     @classmethod
     def from_dict(cls, config_dict: Dict) -> TrainConfigBase:

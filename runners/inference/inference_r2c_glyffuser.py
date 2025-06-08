@@ -36,7 +36,7 @@ def inference_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
 
 
 @click.command()
-@click.option("-p", "--load-checkpoint-path", type=str, required=True,               help="Path to the checkpoint file")
+@click.option("-p", "--load-checkpoint-path", type=str, required=True,                 help="Path to the checkpoint file")
 @click.option("-r", "--run-name-prefix",      type=str, default="inference_r2c_glyff", help="Run name prefix for logging")
 @click.option("-c", "--use-colab",            is_flag=True,                            help="Use Google Colab environment paths")
 def main(*args, **kwargs):

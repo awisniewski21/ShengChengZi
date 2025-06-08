@@ -37,8 +37,8 @@ def inference_c2cbi_cyclegan(
 @click.option("-p", "--load-checkpoint-path", type=str, required=True,                      help="Path to the checkpoint file")
 @click.option("-r", "--run-name-prefix",      type=str, default="inference_c2cbi_cyclegan", help="Run name prefix for logging")
 @click.option("-c", "--use-colab",            is_flag=True,                                 help="Use Google Colab environment paths")
-@click.option("-f", "--font-name",            type=str, default="NotoSansSC-Regular",       help="Font name for rendering input characters")
-@click.option("-fs", "--font-size",           type=int,                                     help="Font size for rendering input characters")
+@click.option("-f", "--font-name",            type=str, default="NotoSansSC-Regular",       help="Font name for character rendering")
+@click.option("-s", "--font-size",            type=int, default=None,                       help="Font size for character rendering (None to auto-scale)")
 def main(input_chars, **kwargs):
     cfg = TrainConfig_C2CBi_CycleGAN(**kwargs)
     return inference_c2cbi_cyclegan(cfg, input_chars, kwargs.get('font_name', 'NotoSansSC-Regular'), kwargs.get('font_size'))

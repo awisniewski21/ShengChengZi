@@ -71,11 +71,12 @@ def train_c2cbi_scz(cfg: TrainConfig_C2CBi_SCZ):
 @click.option("-tbs", "--train-batch-size",          type=int,     help="Training batch size (number of images)")
 @click.option("-ebs", "--eval-batch-size",           type=int,     help="Evaluation batch size (number of images)")
 @click.option("-lr",  "--learning-rate",             type=float,   help="Model learning rate")
+@click.option("-p",   "--load-checkpoint-path",      type=float,   help="Optional path to load model checkpoint from")
 @click.option("-rs",  "--seed",                      type=int,     help="Seed for random number generators")
+@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
 @click.option("-si",  "--log-step-interval",         type=int,     help="Log metrics every N steps")
 @click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
 @click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")
-@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
 def main(**kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
     cfg = TrainConfig_C2CBi_SCZ(**filtered_kwargs)

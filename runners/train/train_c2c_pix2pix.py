@@ -13,28 +13,21 @@ def train_c2c_pix2pix(cfg: TrainConfig_C2C_Pix2Pix):
     print(f"    Epochs: {cfg.num_epochs}")
     print(f"    Learning rate: {cfg.learning_rate}")
 
-    # Create the composite network
     net = Pix2PixNetwork(cfg)
 
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f"Trainable network parameters: {total_params:,}")
 
-    # Create optimizers for generator and discriminator
-    optimizer_G = torch.optim.Adam(
-        net.netG.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999)
-    )
-    optimizer_D = torch.optim.Adam(
-        net.netD.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999)
-    )
+    optimizer_G = torch.optim.Adam(net.netG.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999))
+    optimizer_D = torch.optim.Adam(net.netD.parameters(), lr=cfg.learning_rate, betas=(0.5, 0.999))
 
     training_model = TrainModel_C2C_Pix2Pix(
         config=cfg,
         net=net,
-        optimizer=optimizer_G,  # Generator optimizer goes to base class
+        optimizer=optimizer_G,
         lr_scheduler=None,
-        optimizer_D=optimizer_D,  # Discriminator optimizer goes separately
+        optimizer_D=optimizer_D,
     )
-
     if cfg.load_checkpoint_path is not None:
         training_model.load_checkpoint("train")
 
@@ -51,16 +44,12 @@ def train_c2c_pix2pix(cfg: TrainConfig_C2C_Pix2Pix):
 @click.option("-tbs", "--train-batch-size",          type=int,     help="Training batch size (number of images)")
 @click.option("-ebs", "--eval-batch-size",           type=int,     help="Evaluation batch size (number of images)")
 @click.option("-lr",  "--learning-rate",             type=float,   help="Model learning rate")
+@click.option("-p",   "--load-checkpoint-path",      type=float,   help="Optional path to load model checkpoint from")
 @click.option("-rs",  "--seed",                      type=int,     help="Seed for random number generators")
+@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
 @click.option("-si",  "--log-step-interval",         type=int,     help="Log metrics every N steps")
 @click.option("-ei",  "--eval-epoch-interval",       type=int,     help="Run validation every N epochs")
 @click.option("-ci",  "--checkpoint-epoch-interval", type=int,     help="Save model checkpoints every N epochs")
-@click.option("-c",   "--use-colab",                 is_flag=True, help="Use Google Colab environment paths")
-@click.option("-p",   "--load-checkpoint-path",      type=str,     help="Path to load model checkpoint from")
-@click.option("--lambda-l1",                         type=float,   help="Weight for L1 loss")
-@click.option("--netg",                              type=str,     help="Generator architecture")
-@click.option("--netd",                              type=str,     help="Discriminator architecture")
-@click.option("--gan-mode",                          type=str,     help="GAN loss type")
 def main(**kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
     cfg = TrainConfig_C2C_Pix2Pix(**filtered_kwargs)

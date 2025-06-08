@@ -7,7 +7,6 @@ from core.models.c2c_pix2pix import TrainModel_C2C_Pix2Pix, Pix2PixNetwork
 def test_c2c_pix2pix(cfg: TrainConfig_C2C_Pix2Pix):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for evaluation"
 
-    # Create the composite network
     net = Pix2PixNetwork(cfg)
 
     model = TrainModel_C2C_Pix2Pix(

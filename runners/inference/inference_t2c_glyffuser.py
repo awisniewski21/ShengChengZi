@@ -54,9 +54,9 @@ def inference_t2c_glyffuser(
 
 @click.command()
 @click.argument(    "input_texts",            type=str, required=True, nargs=-1)
-@click.option("-p", "--load-checkpoint-path", type=str, required=True,                     help="Path to the checkpoint file")
-@click.option("-r", "--run-name-prefix",      type=str, default="inference_t2c_glyff",     help="Run name prefix for logging")
-@click.option("-c", "--use-colab",            is_flag=True,                                help="Use Google Colab environment paths")
+@click.option("-p", "--load-checkpoint-path", type=str, required=True,                 help="Path to the checkpoint file")
+@click.option("-r", "--run-name-prefix",      type=str, default="inference_t2c_glyff", help="Run name prefix for logging")
+@click.option("-c", "--use-colab",            is_flag=True,                            help="Use Google Colab environment paths")
 def main(*args, input_texts: List[str], **kwargs):
     cfg = TrainConfig_T2C_Glyff(*args, **kwargs)
     return inference_t2c_glyffuser(cfg, list(input_texts))

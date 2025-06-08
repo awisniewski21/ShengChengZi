@@ -38,6 +38,7 @@ class TrainModelBase(ABC):
         self.run_name = f"{self.config.run_name_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.current_epoch = 0
         self.global_step = 0
+        self.best_val_loss = float("inf")
 
         self.train_dataloader, self.val_dataloader, self.test_dataloader = get_dataloaders(
             self.config, 
@@ -64,13 +65,15 @@ class TrainModelBase(ABC):
             print(f"Epoch {epoch}/{self.config.num_epochs}: {train_metrics}")
 
             # Validation epoch
+            val_loss = None
             if self.val_dataloader is not None and epoch % self.config.eval_epoch_interval == 0:
                 val_metrics = self.eval_epoch("val")
                 self.log_metrics(val_metrics, self.current_epoch, "val")
+                val_loss = val_metrics["loss"]
                 print(f"Validation at epoch {epoch}: {val_metrics}")
 
             # Save model checkpoint
-            self.save_checkpoint()
+            self.save_checkpoint(val_loss=val_loss)
 
         print("Training completed!")
         self.writer.close()
@@ -194,20 +197,35 @@ class TrainModelBase(ABC):
             "run_name": self.run_name,
             "current_epoch": self.current_epoch,
             "global_step": self.global_step,
+            "best_val_loss": self.best_val_loss,
             "model_state_dict": self.net.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "lr_scheduler_state_dict": self.lr_scheduler.state_dict() if self.lr_scheduler else None,
         }
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, val_loss: float | None = None):
         """
         Save the current model to a checkpoint file
         """
+        new_best_chkpt = val_loss is not None and val_loss < self.best_val_loss
+        if new_best_chkpt:
+            self.best_val_loss = val_loss
+
+        # Latest checkpoint
         chkpt_data = self.get_checkpoint_data()
         torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_latest.pt")
-        if (self.current_epoch > 0 and self.current_epoch % self.config.checkpoint_epoch_interval == 0) or self.current_epoch == self.config.num_epochs - 1:
-            torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_epoch_{self.current_epoch}.pt")
-            print(f"Saved checkpoint at epoch {self.current_epoch}")
+
+        # Best checkpoint
+        if new_best_chkpt:
+            torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_best.pt")
+            print(f"Saved new best checkpoint at epoch {self.current_epoch} (best_val_loss: {self.best_val_loss:.4f})")
+
+        # Periodic checkpoint
+        chkpt_int = self.config.checkpoint_epoch_interval
+        if chkpt_int > 0 and self.current_epoch > 0:
+            if self.current_epoch % chkpt_int == 0 or self.current_epoch == self.config.num_epochs - 1:
+                torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_epoch_{self.current_epoch}.pt")
+                print(f"Saved new checkpoint at epoch {self.current_epoch}")
 
     def load_checkpoint(self, phase: str):
         """
@@ -235,6 +253,7 @@ class TrainModelBase(ABC):
         # Load and update model state
         self.current_epoch = chkpt_data["current_epoch"] + 1 # Start at next epoch
         self.global_step = chkpt_data["global_step"]
+        self.best_val_loss = chkpt_data.get("best_val_loss", float("inf"))
         self.net.load_state_dict(chkpt_data["model_state_dict"])
         if phase.lower() == "train":
             self.optimizer.load_state_dict(chkpt_data["optimizer_state_dict"])
@@ -243,8 +262,8 @@ class TrainModelBase(ABC):
 
         # Reinitialize dataloaders with updated config
         self.train_dataloader, self.val_dataloader, self.test_dataloader = get_dataloaders(
-            self.config, 
-            root_image_dir=self.config.root_image_dir, 
+            self.config,
+            root_image_dir=self.config.root_image_dir,
             metadata_path=self.config.image_metadata_path,
         )
 

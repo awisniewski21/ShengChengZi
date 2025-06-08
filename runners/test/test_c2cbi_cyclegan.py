@@ -7,7 +7,6 @@ from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN, CycleGANNetwor
 def test_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for evaluation"
 
-    # Create the composite network
     net = CycleGANNetwork(cfg)
 
     model = TrainModel_C2CBi_CycleGAN(
