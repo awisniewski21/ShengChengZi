@@ -1,9 +1,12 @@
+import pickle
 import sys
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
@@ -61,13 +64,15 @@ class TrainModelBase(ABC):
 
             # Training epoch
             train_metrics = self.train_epoch()
+            train_metrics = {k: np.mean(v) for k, v in train_metrics.items()} # Average metrics
             self.log_metrics(train_metrics, self.current_epoch, "train")
             print(f"Epoch {epoch}/{self.config.num_epochs}: {train_metrics}")
 
             # Validation epoch
             val_loss = None
             if self.val_dataloader is not None and epoch % self.config.eval_epoch_interval == 0:
-                val_metrics = self.eval_epoch("val")
+                val_metrics, _ = self.eval_epoch("val")
+                val_metrics = {k: np.mean(v) for k, v in val_metrics.items()} # Average metrics
                 self.log_metrics(val_metrics, self.current_epoch, "val")
                 val_loss = val_metrics["loss"]
                 print(f"Validation at epoch {epoch}: {val_metrics}")
@@ -84,19 +89,18 @@ class TrainModelBase(ABC):
         Train the model for one epoch and return metrics
         """
         self.net.train()
-        epoch_metrics = {"loss": 0.0, "count": 0}
+        epoch_metrics = defaultdict(list)
 
         pbar = tqdm(self.train_dataloader, desc=f"Epoch {self.current_epoch}")
         for batch_data in pbar:
             # Forward pass, loss computation, and backward pass
             loss = self.train_step(batch_data)
 
-            epoch_metrics["loss"] += loss
-            epoch_metrics["count"] += 1
+            epoch_metrics["loss"].append(loss)
+            epoch_metrics["learning_rate"].append(self.optimizer.param_groups[0]["lr"])
             self.global_step += 1
 
-            avg_loss = epoch_metrics["loss"] / epoch_metrics["count"]
-            pbar.set_postfix({"loss": f"{avg_loss:.4f}"})
+            pbar.set_postfix({"loss": f"{np.mean(epoch_metrics['loss']):.4f}"})
 
             if self.global_step % self.config.log_step_interval == 0:
                 self.writer.add_scalar("train_step/loss", loss, self.global_step)
@@ -104,10 +108,7 @@ class TrainModelBase(ABC):
                     self.writer.add_scalar("train_step/learning_rate", self.optimizer.param_groups[0]["lr"], self.global_step)
                 self.writer.flush()
 
-        return {
-            "loss": epoch_metrics["loss"] / epoch_metrics["count"],
-            "learning_rate": self.optimizer.param_groups[0]["lr"]
-        }
+        return epoch_metrics
 
     @abstractmethod
     def train_step(self, batch_data) -> float:
@@ -117,12 +118,13 @@ class TrainModelBase(ABC):
         """
         pass
 
-    def eval_epoch(self, phase: str) -> Dict:
+    def eval_epoch(self, phase: str) -> Tuple[Dict, List]:
         """
-        Evaluate the model for one epoch and return metrics
+        Evaluate the model for one epoch and return the results
         """
         self.net.eval()
-        eval_metrics = {"loss": 0.0, "count": 0}
+        eval_metrics = defaultdict(list)
+        eval_results = defaultdict(list)
 
         if phase.lower() == "val":
             dataloader = self.val_dataloader
@@ -135,24 +137,28 @@ class TrainModelBase(ABC):
 
         with torch.no_grad():
             for batch_ix, batch_data in tqdm(enumerate(dataloader), desc=desc):
-                loss, out_grid_img, out_labels = self.eval_step(batch_data, phase)
-                eval_metrics["loss"] += loss
-                eval_metrics["count"] += 1
+                loss, out_grid_img, out_labels, metrics, info = self.eval_step(batch_data, phase)
+                eval_metrics["loss"].append(loss)
+                for key, value in metrics.items():
+                    eval_metrics[key].append(value)
+                eval_results["out_grid_imgs"].append(out_grid_img)
+                eval_results["out_labels"].append(out_labels)
+                eval_results["info"].append(info)
 
                 if batch_ix == 0 or phase.lower() == "test":
                     self._log_image_grid(out_grid_img, phase, batch_ix, out_labels=out_labels)
 
-        return {"loss": eval_metrics["loss"] / eval_metrics["count"]}
+        return eval_metrics, eval_results
 
     @abstractmethod
-    def eval_step(self, batch_data, phase: str) -> Tuple[float, torch.Tensor]:
+    def eval_step(self, batch_data, phase: str) -> Tuple[float, torch.Tensor, List[str] | None, Dict, Dict]:
         """
         Perform a single evaluation step on a batch of data
         Includes forward pass, loss computation, and logging output images
         """
         pass
 
-    def test(self):
+    def test(self) -> Tuple[Dict, Dict]:
         """
         Run inference on the model using the test dataset and log the results
         """
@@ -160,14 +166,15 @@ class TrainModelBase(ABC):
 
         assert self.test_dataloader is not None, "Test dataloader must be defined for testing"
         self.writer = SummaryWriter(log_dir=str(self.log_dir))
-
-        test_metrics = self.eval_epoch("test")
-        self.log_metrics(test_metrics, self.current_epoch, "test")
-        print(f"Test metrics: {test_metrics}")
-
+        test_metrics, test_results = self.eval_epoch("test")
         self.writer.close()
+        with open(self.log_dir / "test_metrics.pkl", "wb") as f:
+            pickle.dump(test_metrics, f)
+        with open(self.log_dir / "test_results.pkl", "wb") as f:
+            pickle.dump(test_results, f)
+        return test_metrics, test_results
 
-    def inference(self, input_data):
+    def inference(self, input_data) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         """
         Run inference on the model using the provided input data
         """
@@ -177,10 +184,11 @@ class TrainModelBase(ABC):
 
         self.net.eval()
         with torch.no_grad():
-            out_grid_img, out_labels = self.inference_step(input_data)
+            out_grid_img, out_labels, info = self.inference_step(input_data)
             self._log_image_grid(out_grid_img, "inference", 0, out_labels=out_labels)
+        return out_grid_img, out_labels, info
 
-    def inference_step(self, input_data) -> Tuple[torch.Tensor, List[str] | None]:
+    def inference_step(self, input_data) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         """
         Perform a single inference step on input data
         Includes forward pass and logging output images

@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from core.configs import TrainConfig_C2CBi_CycleGAN
 from core.models import TrainModelBase
-from core.utils.image_utils import make_image_grid, to_out_img
+from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img
 from cyclegan_and_pix2pix.cyclegan_network import CycleGANNetwork, CycleGANOutput  # NOQA
 from cyclegan_and_pix2pix.image_pool import ImagePool
 from cyclegan_and_pix2pix.networks import GANLoss
@@ -64,42 +64,41 @@ class TrainModel_C2CBi_CycleGAN(TrainModelBase):
 
         return loss_G.item()
 
-    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None]:
-        src_imgs, trg_imgs = batch_data
-        real_A = src_imgs.to(self.device)
-        real_B = trg_imgs.to(self.device)
+    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None, Dict]:
+        real_A, real_B = batch_data
+        real_A = real_A.to(self.device)
+        real_B = real_B.to(self.device)
 
-        with torch.no_grad():
-            out = self.net.forward(real_A, real_B)
-            eval_loss = (self.loss_cycle(out.rec_A, real_A) + self.loss_cycle(out.rec_B, real_B)) / 2
+        out = self.net.forward(real_A, real_B)
+
+        eval_loss = (self.loss_cycle(out.rec_A, real_A) + self.loss_cycle(out.rec_B, real_B)) / 2
 
         real_A_out = to_out_img(real_A, (0, 1))
-        fake_B_out = to_out_img(out.fake_B, (-1, 1))
-        rec_A_out = to_out_img(out.rec_A, (-1, 1))
+        fake_B_out = to_out_img(out.fake_B, (0, 1))
+        rec_A_out = to_out_img(out.rec_A, (0, 1))
         real_B_out = to_out_img(real_B, (0, 1))
-        fake_A_out = to_out_img(out.fake_A, (-1, 1))
-        rec_B_out = to_out_img(out.rec_B, (-1, 1))
+        fake_A_out = to_out_img(out.fake_A, (0, 1))
+        rec_B_out = to_out_img(out.rec_B, (0, 1))
+        grid_img = make_image_grid([real_A_out, fake_B_out, rec_A_out, real_B_out, fake_A_out, rec_B_out])
 
-        grid_img = make_image_grid([
-            real_A_out, fake_B_out, rec_A_out,
-            real_B_out, fake_A_out, rec_B_out
-        ])
+        metrics = {"A": compute_image_metrics(out.rec_A, real_A), "B": compute_image_metrics(out.rec_B, real_B)}
+        metrics = {k: (metrics["A"][k] + metrics["B"][k]) / 2 for k in metrics["A"].keys()}
+        info = {"real_A": real_A, "fake_B": out.fake_B, "rec_A": out.rec_A, "real_B": real_B, "fake_A": out.fake_A, "rec_B": out.rec_B}
 
-        return eval_loss.item(), grid_img, None
+        return eval_loss.item(), grid_img, None, metrics, info
 
-    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None]:
+    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         real_AB = input_data.to(self.device)
 
-        with torch.no_grad():
-            fake_B = self.net.netG_A(real_AB) # input -> B
-            fake_A = self.net.netG_B(real_AB) # input -> A
+        fake_B = self.net.netG_A(real_AB) # input -> B
+        fake_A = self.net.netG_B(real_AB) # input -> A
 
         real_AB_out = to_out_img(real_AB, (0, 1))
         fake_B_out = to_out_img(fake_B, (-1, 1))
         fake_A_out = to_out_img(fake_A, (-1, 1))
         grid_img = make_image_grid([real_AB_out, fake_B_out, fake_A_out])
 
-        return grid_img, None
+        return grid_img, None, {"real_AB": real_AB, "fake_B": fake_B, "fake_A": fake_A}
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()

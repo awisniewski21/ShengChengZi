@@ -31,9 +31,7 @@ def test_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
     )
     model.load_checkpoint("test")
 
-    test_metrics = model.test()
-
-    return test_metrics
+    return model.test()
 
 
 @click.command()

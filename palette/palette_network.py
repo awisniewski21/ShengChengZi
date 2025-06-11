@@ -168,9 +168,10 @@ class PaletteNetwork(nn.Module):
         for i in tqdm(reversed(range(0, self.num_timesteps)), total=self.num_timesteps):
             t = torch.full((b,), i, device=y_cond.device, dtype=torch.long)
             y_t = self.p_sample(y_t, t, y_cond=y_cond)
+            y_t_out = ((y_t + 1) / 2).clamp(0, 1)
             if i % sample_inter == 0:
-                ret_arr = torch.cat([ret_arr, y_t], dim=0)
-        return y_t, ret_arr
+                ret_arr = torch.cat([ret_arr, y_t_out], dim=0)
+        return y_t_out, ret_arr
 
     def forward(self, y_0: torch.Tensor, y_cond: torch.Tensor | None = None, noise: torch.Tensor | None = None) -> float:
         # Sample from p(gammas)

@@ -5,7 +5,7 @@ import torch
 
 from core.configs import TrainConfig_C2C_Palette
 from core.models import TrainModelBase
-from core.utils.image_utils import make_image_grid, to_out_img
+from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img
 from palette.palette_network import PaletteNetwork
 from palette.utils import update_model_average
 
@@ -45,7 +45,7 @@ class TrainModel_C2C_Palette(TrainModelBase):
 
         return train_loss.item()
 
-    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None]:
+    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None, Dict, Dict]:
         src_imgs, trg_imgs = batch_data
         src_imgs = src_imgs.to(self.device)
         trg_imgs = trg_imgs.to(self.device)
@@ -56,21 +56,24 @@ class TrainModel_C2C_Palette(TrainModelBase):
 
         src_imgs_out = to_out_img(src_imgs, (0, 1))
         trg_imgs_out = to_out_img(trg_imgs, (0, 1))
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([src_imgs_out, pred_imgs_out, trg_imgs_out])
 
-        return eval_loss.item(), grid_img, None
+        metrics = compute_image_metrics(pred_imgs, trg_imgs)
+        info = {"src_imgs": src_imgs, "pred_imgs": pred_imgs, "trg_imgs": trg_imgs}
 
-    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None]:
+        return eval_loss.item(), grid_img, None, metrics, info
+
+    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         src_imgs = input_data.to(self.device)
 
         pred_imgs, _ = self.net.restoration(src_imgs, sample_num=self.config.sample_num)
 
         src_imgs_out = to_out_img(src_imgs, (0, 1))
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([src_imgs_out, pred_imgs_out])
 
-        return grid_img, None
+        return grid_img, None, {"src_imgs": src_imgs, "pred_imgs": pred_imgs}
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()

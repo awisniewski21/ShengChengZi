@@ -52,12 +52,12 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
             output_type="numpy",
         ).images
 
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([pred_imgs_out])
 
-        return 0, grid_img, None
+        return 0, grid_img, None, {}, {"pred_imgs": pred_imgs}
 
-    def inference_step(self, input_data: None = None) -> Tuple[torch.Tensor, List[str] | None]:
+    def inference_step(self, input_data: None = None) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         inference_pipeline = DDPMPipeline(unet=self.net, scheduler=self.inference_scheduler)
         inference_pipeline.set_progress_bar_config(desc="Generating inference image grid...")
 
@@ -68,18 +68,18 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
             output_type="numpy",
         ).images
 
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([pred_imgs_out])
 
-        return grid_img, None
+        return grid_img, None, {"pred_imgs": pred_imgs}
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
-        chkpt_data["noise_scheduler_state"] = self.noise_scheduler
-        chkpt_data["inference_scheduler_state"] = self.inference_scheduler
+        chkpt_data["noise_scheduler_state"] = dict(self.noise_scheduler.config)
+        chkpt_data["inference_scheduler_state"] = dict(self.inference_scheduler.config)
         return chkpt_data
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data, phase)
-        self.noise_scheduler = chkpt_data["noise_scheduler_state"]
-        self.inference_scheduler = chkpt_data["inference_scheduler_state"]
+        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_state"])
+        self.inference_scheduler = DPMSolverMultistepScheduler.from_config(chkpt_data["inference_scheduler_state"])
