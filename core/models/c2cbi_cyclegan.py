@@ -81,8 +81,11 @@ class TrainModel_C2CBi_CycleGAN(TrainModelBase):
         rec_B_out = to_out_img(out.rec_B, (0, 1))
         grid_img = make_image_grid([real_A_out, fake_B_out, rec_A_out, real_B_out, fake_A_out, rec_B_out])
 
-        metrics = {"A": compute_image_metrics(out.rec_A, real_A), "B": compute_image_metrics(out.rec_B, real_B)}
-        metrics = {k: (metrics["A"][k] + metrics["B"][k]) / 2 for k in metrics["A"].keys()}
+        out_metrics = {"A": compute_image_metrics(out.fake_B, real_B), "B": compute_image_metrics(out.fake_A, real_A)}
+        out_metrics = {k: (out_metrics["A"][k] + out_metrics["B"][k]) / 2 for k in out_metrics["A"].keys()}
+        rec_metrics = {"A": compute_image_metrics(out.rec_A, real_A), "B": compute_image_metrics(out.rec_B, real_B)}
+        rec_metrics = {f"cycle_{k}": (rec_metrics["A"][k] + rec_metrics["B"][k]) / 2 for k in rec_metrics["A"].keys()}
+        metrics = out_metrics | rec_metrics
         info = {"real_A": real_A, "fake_B": out.fake_B, "rec_A": out.rec_A, "real_B": real_B, "fake_A": out.fake_A, "rec_B": out.rec_B}
 
         return eval_loss.item(), grid_img, None, metrics, info
