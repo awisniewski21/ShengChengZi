@@ -1,13 +1,13 @@
 from typing import Dict, List, Tuple
 
 import torch
-from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DConditionModel  # NOQA
+from diffusers import DDPMPipeline, DDPMScheduler, UNet2DConditionModel  # NOQA
 from diffusers.pipelines.pipeline_utils import ImagePipelineOutput  # NOQA
 from diffusers.utils.torch_utils import randn_tensor
 
 from core.configs import TrainConfig_T2C_Glyff
 from core.models import TrainModelBase
-from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img
+from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img  # NOQA
 
 
 class TrainModel_T2C_Glyffuser(TrainModelBase):
@@ -17,7 +17,7 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
     config: TrainConfig_T2C_Glyff
     net: UNet2DConditionModel
 
-    def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DPMSolverMultistepScheduler, **kwargs):
+    def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DDPMScheduler, **kwargs):
         super().__init__(**kwargs)
 
         self.noise_scheduler = noise_scheduler
@@ -58,10 +58,11 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
             src_texts_embed,
             src_texts_mask,
             batch_size=self.config.eval_batch_size,
-            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            generator=torch.Generator(device=self.device if self.device != torch.device("mps") else "cpu").manual_seed(self.config.seed),
+            num_inference_steps=1000,
             output_type="numpy",
         ).images
+        pred_imgs = torch.from_numpy(pred_imgs.transpose((0, 3, 1, 2))).to(self.device) # NHWC numpy -> NCHW torch
 
         eval_loss = torch.nn.functional.mse_loss(pred_imgs, trg_imgs)
 
@@ -86,10 +87,11 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
             src_texts_embed,
             src_texts_mask,
             batch_size=self.config.eval_batch_size,
-            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            generator=torch.Generator(device=self.device if self.device != torch.device("mps") else "cpu").manual_seed(self.config.seed),
+            num_inference_steps=1000,
             output_type="numpy",
         ).images
+        pred_imgs = torch.from_numpy(pred_imgs.transpose((0, 3, 1, 2))).to(self.device) # NHWC numpy -> NCHW torch
 
         pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([pred_imgs_out])
@@ -98,14 +100,14 @@ class TrainModel_T2C_Glyffuser(TrainModelBase):
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
-        chkpt_data["noise_scheduler_state"] = dict(self.noise_scheduler.config)
-        chkpt_data["inference_scheduler_state"] = dict(self.inference_scheduler.config)
+        chkpt_data["noise_scheduler_config"] = dict(self.noise_scheduler.config)
+        chkpt_data["inference_scheduler_config"] = dict(self.inference_scheduler.config)
         return chkpt_data
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data, phase)
-        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_state"])
-        self.inference_scheduler = DPMSolverMultistepScheduler.from_config(chkpt_data["inference_scheduler_state"])
+        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_config"])
+        self.inference_scheduler = DDPMScheduler.from_config(chkpt_data["inference_scheduler_config"])
 
 
 class DiffusionPipeline_T2C_Glyff(DDPMPipeline):
@@ -113,7 +115,7 @@ class DiffusionPipeline_T2C_Glyff(DDPMPipeline):
     Inference diffusion pipeline for text-to-image generation
     """
     unet: UNet2DConditionModel
-    scheduler: DPMSolverMultistepScheduler
+    scheduler: DDPMScheduler
 
     @torch.no_grad()
     def __call__(

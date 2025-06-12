@@ -2,7 +2,7 @@ from pathlib import Path
 
 import rich_click as click
 import torch
-from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel
+from diffusers import DDPMScheduler, UNet2DModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
 from core.configs import TrainConfig_R2C_Glyff
@@ -45,7 +45,7 @@ def train_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
         num_training_steps=len(train_dataloader) * cfg.num_epochs,
     )
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
-    inference_scheduler = DPMSolverMultistepScheduler(num_train_timesteps=1000)
+    inference_scheduler = DDPMScheduler()
 
     training_model = TrainModel_R2C_Glyffuser(
         config=cfg,

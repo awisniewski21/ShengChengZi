@@ -51,12 +51,28 @@ class CycleGANNetwork(nn.Module):
 
     def forward(self, real_A: torch.Tensor, real_B: torch.Tensor) -> CycleGANOutput:
         """ Run forward pass for CycleGAN """
-        fake_B = ((self.netG_A(real_A) + 1) / 2).clamp(0, 1) # G_A(A)
-        rec_A = ((self.netG_B(fake_B) + 1) / 2).clamp(0, 1)  # G_B(G_A(A))
-        fake_A = ((self.netG_B(real_B) + 1) / 2).clamp(0, 1) # G_B(B)
-        rec_B = ((self.netG_A(fake_A) + 1) / 2).clamp(0, 1)  # G_A(G_B(B))
+        fake_B = self.forward_G_A(real_A) # G_A(A)
+        rec_A = self.forward_G_B(fake_B)  # G_B(G_A(A))
+        fake_A = self.forward_G_B(real_B) # G_B(B)
+        rec_B = self.forward_G_A(fake_A)  # G_A(G_B(B))
 
         return CycleGANOutput(fake_B, rec_A, fake_A, rec_B)
+
+    def forward_G_A(self, img: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for generator G_A """
+        return ((self.netG_A(img) + 1) / 2).clamp(0, 1)
+
+    def forward_G_B(self, img: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for generator G_B """
+        return ((self.netG_B(img) + 1) / 2).clamp(0, 1)
+
+    def forward_D_A(self, img: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for discriminator D_A """
+        return self.netD_A(img)
+
+    def forward_D_B(self, img: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for discriminator D_B """
+        return self.netD_B(img)
 
     def set_G_requires_grad(self, requires_grad: bool = False):
         """ Set requires_grad for all generators """

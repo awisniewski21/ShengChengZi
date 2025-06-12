@@ -1,5 +1,5 @@
 import rich_click as click
-from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel
+from diffusers import DDPMScheduler, UNet2DModel
 
 from core.configs import TrainConfig_R2C_Glyff
 from core.models.r2c_glyffuser import TrainModel_R2C_Glyffuser
@@ -19,7 +19,7 @@ def inference_r2c_glyffuser(cfg: TrainConfig_R2C_Glyff):
     )
 
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
-    inference_scheduler = DPMSolverMultistepScheduler(num_train_timesteps=1000)
+    inference_scheduler = DDPMScheduler()
 
     model = TrainModel_R2C_Glyffuser(
         config=cfg,

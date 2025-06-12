@@ -90,12 +90,12 @@ class TrainModel_C2CBi_CycleGAN(TrainModelBase):
     def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         real_AB = input_data.to(self.device)
 
-        fake_B = self.net.netG_A(real_AB) # input -> B
-        fake_A = self.net.netG_B(real_AB) # input -> A
+        fake_B = self.net.forward_G_A(real_AB) # input -> A
+        fake_A = self.net.forward_G_B(real_AB) # input -> B
 
         real_AB_out = to_out_img(real_AB, (0, 1))
-        fake_B_out = to_out_img(fake_B, (-1, 1))
-        fake_A_out = to_out_img(fake_A, (-1, 1))
+        fake_B_out = to_out_img(fake_B, (0, 1))
+        fake_A_out = to_out_img(fake_A, (0, 1))
         grid_img = make_image_grid([real_AB_out, fake_B_out, fake_A_out])
 
         return grid_img, None, {"real_AB": real_AB, "fake_B": fake_B, "fake_A": fake_A}
@@ -133,15 +133,15 @@ class TrainModel_C2CBi_CycleGAN(TrainModelBase):
 
         # Identity losses
         if lambda_idt > 0:
-            loss_idt_A = self.loss_identity(self.net.netG_A(real_B), real_B) * lambda_B * lambda_idt # G_A(B) should be close to B
-            loss_idt_B = self.loss_identity(self.net.netG_B(real_A), real_A) * lambda_A * lambda_idt # G_B(A) should be close to A
+            loss_idt_A = self.loss_identity(self.net.forward_G_A(real_B), real_B) * lambda_B * lambda_idt # G_A(B) should be close to B
+            loss_idt_B = self.loss_identity(self.net.forward_G_B(real_A), real_A) * lambda_A * lambda_idt # G_B(A) should be close to A
         else:
             loss_idt_A = 0
             loss_idt_B = 0
 
         # GAN losses
-        loss_G_A = self.loss_gan(self.net.netD_A(out.fake_B), True) # D_A(G_A(A))
-        loss_G_B = self.loss_gan(self.net.netD_B(out.fake_A), True) # D_B(G_B(B))
+        loss_G_A = self.loss_gan(self.net.forward_D_A(out.fake_B), True) # D_A(G_A(A)) should be True
+        loss_G_B = self.loss_gan(self.net.forward_D_B(out.fake_A), True) # D_B(G_B(B)) should be True
 
         # Cycle losses
         loss_cycle_A = self.loss_cycle(out.rec_A, real_A) * lambda_A # G_B(G_A(A)) should be close to A
@@ -154,14 +154,14 @@ class TrainModel_C2CBi_CycleGAN(TrainModelBase):
         """ Calculate the loss for the discriminators """
         # Discriminator A losses
         fake_B = self.fake_B_pool.query(out.fake_B)
-        loss_D_A_real = self.loss_gan(self.net.netD_A(real_B), True) # D_A(real_B) should be True
-        loss_D_A_fake = self.loss_gan(self.net.netD_A(fake_B.detach()), False) # D_A(G_A(A)) should be False
+        loss_D_A_real = self.loss_gan(self.net.forward_D_A(real_B), True) # D_A(real_B) should be True
+        loss_D_A_fake = self.loss_gan(self.net.forward_D_A(fake_B.detach()), False) # D_A(G_A(A)) should be False
         loss_D_A = (loss_D_A_real + loss_D_A_fake) * 0.5
 
         # Discriminator B losses
         fake_A = self.fake_A_pool.query(out.fake_A)
-        loss_D_B_real = self.loss_gan(self.net.netD_B(real_A), True) # D_B(real_A) should be True
-        loss_D_B_fake = self.loss_gan(self.net.netD_B(fake_A.detach()), False) # D_B(G_B(B)) should be False
+        loss_D_B_real = self.loss_gan(self.net.forward_D_B(real_A), True) # D_B(real_A) should be True
+        loss_D_B_fake = self.loss_gan(self.net.forward_D_B(fake_A.detach()), False) # D_B(G_B(B)) should be False
         loss_D_B = (loss_D_B_real + loss_D_B_fake) * 0.5
 
         return loss_D_A, loss_D_B

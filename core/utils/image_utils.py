@@ -26,7 +26,9 @@ def chars_to_image_tensor(input_chars: List[str], image_size: int, font_name: st
 
     return torch.stack([transform(create_image(c, image_size, font)) for c in input_chars])
 
-def to_out_img(img: torch.Tensor, value_range: Tuple[int, int]) -> torch.Tensor:
+def to_out_img(img: torch.Tensor | np.ndarray, value_range: Tuple[int, int]) -> torch.Tensor:
+    if isinstance(img, np.ndarray):
+        img = torch.from_numpy(img)
     img = img.detach()
     if value_range == (-1, 1):
         img = ((img + 1) / 2).clamp(0, 1)

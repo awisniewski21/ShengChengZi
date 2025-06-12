@@ -5,7 +5,7 @@ from diffusers import DDPMScheduler, UNet2DModel
 
 from core.configs import TrainConfig_C2CBi_SCZ
 from core.models import TrainModelBase
-from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img
+from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img  # NOQA
 
 
 class TrainModel_C2CBi_SCZ(TrainModelBase):
@@ -85,9 +85,9 @@ class TrainModel_C2CBi_SCZ(TrainModelBase):
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
-        chkpt_data["noise_scheduler_state"] = dict(self.noise_scheduler.config)
+        chkpt_data["noise_scheduler_config"] = dict(self.noise_scheduler.config)
         return chkpt_data
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data, phase)
-        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_state"])
+        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_config"])
