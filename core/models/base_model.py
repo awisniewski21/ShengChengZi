@@ -39,7 +39,7 @@ class TrainModelBase(ABC):
         self.device = get_device()
         self.net = self.net.to(self.device)
         self.run_name = f"{self.config.run_name_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.current_epoch = 0
+        self.current_epoch = 1
         self.global_step = 0
         self.best_val_loss = float("inf")
 
@@ -54,12 +54,12 @@ class TrainModelBase(ABC):
         """
         Main training loop that handles training, evaluation, and logging
         """
-        print(f"Starting {self.config.run_name_prefix} training from epoch {self.current_epoch} for {self.config.num_epochs - self.current_epoch} more epochs...")
+        print(f"Starting {self.config.run_name_prefix} training from epoch {self.current_epoch} for {self.config.num_epochs - self.current_epoch + 1} more epochs...")
 
         assert self.optimizer is not None, "Optimizer must be defined for training"
         self.writer = SummaryWriter(log_dir=str(self.log_dir))
 
-        for epoch in range(self.current_epoch, self.config.num_epochs):
+        for epoch in range(self.current_epoch, self.config.num_epochs + 1):
             self.current_epoch = epoch
 
             # Training epoch
@@ -230,8 +230,8 @@ class TrainModelBase(ABC):
 
         # Periodic checkpoint
         chkpt_int = self.config.checkpoint_epoch_interval
-        if chkpt_int > 0 and self.current_epoch > 0:
-            if self.current_epoch % chkpt_int == 0 or self.current_epoch == self.config.num_epochs - 1:
+        if chkpt_int > 0 and self.current_epoch > 1:
+            if self.current_epoch % chkpt_int == 0 or self.current_epoch == self.config.num_epochs:
                 torch.save(chkpt_data, self.checkpoint_dir / f"{self.config.run_name_prefix}_epoch_{self.current_epoch}.pt")
                 print(f"Saved new checkpoint at epoch {self.current_epoch}")
 
