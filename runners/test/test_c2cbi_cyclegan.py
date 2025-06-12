@@ -18,9 +18,7 @@ def test_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):
     )
     model.load_checkpoint("test")
 
-    test_metrics = model.test()
-
-    return test_metrics
+    return model.test()
 
 
 @click.command()

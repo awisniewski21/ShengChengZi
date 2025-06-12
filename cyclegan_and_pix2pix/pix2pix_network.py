@@ -41,7 +41,8 @@ class Pix2PixNetwork(nn.Module):
 
     def forward(self, real_A: torch.Tensor) -> torch.Tensor:
         """ Run forward pass for Pix2Pix """
-        return self.netG(real_A) # G(A)
+        fake_B = self.netG(real_A) # G(A)
+        return ((fake_B + 1) / 2).clamp(0, 1)
 
     def set_G_requires_grad(self, requires_grad: bool = False):
         """ Set requires_grad for all generators """

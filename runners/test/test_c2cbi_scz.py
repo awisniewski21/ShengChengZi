@@ -31,9 +31,7 @@ def test_c2cbi_scz(cfg: TrainConfig_C2CBi_SCZ):
     )
     model.load_checkpoint("test")
 
-    test_metrics = model.test()
-
-    return test_metrics
+    return model.test()
 
 
 @click.command()

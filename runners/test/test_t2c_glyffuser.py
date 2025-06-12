@@ -1,5 +1,5 @@
 import rich_click as click
-from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, UNet2DConditionModel
+from diffusers import DDPMScheduler, UNet2DConditionModel
 
 from core.configs import TrainConfig_T2C_Glyff
 from core.models.t2c_glyffuser import TrainModel_T2C_Glyffuser
@@ -23,7 +23,7 @@ def test_t2c_glyffuser(cfg: TrainConfig_T2C_Glyff):
     )
 
     noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
-    inference_scheduler = DPMSolverMultistepScheduler(num_train_timesteps=1000)
+    inference_scheduler = DDPMScheduler()
 
     model = TrainModel_T2C_Glyffuser(
         config=cfg,
@@ -35,9 +35,7 @@ def test_t2c_glyffuser(cfg: TrainConfig_T2C_Glyff):
     )
     model.load_checkpoint("test")
 
-    test_metrics = model.test()
-
-    return test_metrics
+    return model.test()
 
 
 @click.command()

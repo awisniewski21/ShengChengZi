@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from core.configs import TrainConfig_C2C_Pix2Pix
 from core.models import TrainModelBase
-from core.utils.image_utils import make_image_grid, to_out_img
+from core.utils.image_utils import compute_image_metrics, make_image_grid, to_out_img
 from cyclegan_and_pix2pix.networks import GANLoss
 from cyclegan_and_pix2pix.pix2pix_network import Pix2PixNetwork
 
@@ -52,34 +52,35 @@ class TrainModel_C2C_Pix2Pix(TrainModelBase):
 
         return loss_G.item()
 
-    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None]:
+    def eval_step(self, batch_data: Tuple[torch.Tensor, torch.Tensor], phase: str) -> Tuple[float, torch.Tensor, List[str] | None, Dict, Dict]:
         real_A, real_B = batch_data
         real_A = real_A.to(self.device)
         real_B = real_B.to(self.device)
 
-        with torch.no_grad():
-            fake_B = self.net(real_A)
-            eval_loss = self.loss_l1(fake_B, real_B)
+        fake_B = self.net(real_A)
+
+        eval_loss = self.loss_l1(fake_B, real_B)
 
         real_A_out = to_out_img(real_A, (0, 1))
-        fake_B_out = to_out_img(fake_B, (-1, 1))
+        fake_B_out = to_out_img(fake_B, (0, 1))
         real_B_out = to_out_img(real_B, (0, 1))
-
         grid_img = make_image_grid([real_A_out, fake_B_out, real_B_out])
 
-        return eval_loss.item(), grid_img, None
+        metrics = compute_image_metrics(fake_B, real_B)
+        info = {"real_A": real_A, "fake_B": fake_B, "real_B": real_B}
 
-    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None]:
+        return eval_loss.item(), grid_img, None, metrics, info
+
+    def inference_step(self, input_data: torch.Tensor) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         real_A = input_data.to(self.device)
 
-        with torch.no_grad():
-            fake_B = self.net(real_A)
+        fake_B = self.net(real_A)
 
         real_A_out = to_out_img(real_A, (0, 1))
-        fake_B_out = to_out_img(fake_B, (-1, 1))
+        fake_B_out = to_out_img(fake_B, (0, 1))
         grid_img = make_image_grid([real_A_out, fake_B_out])
 
-        return grid_img, None
+        return grid_img, None, {"real_A": real_A, "fake_B": fake_B}
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()

@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 
 import torch
-from diffusers import DDPMPipeline, DDPMScheduler, DPMSolverMultistepScheduler, UNet2DModel  # NOQA
+from diffusers import DDPMPipeline, DDPMScheduler, UNet2DModel  # NOQA
 
 from core.configs import TrainConfig_R2C_Glyff
 from core.models import TrainModelBase
@@ -15,7 +15,7 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
     config: TrainConfig_R2C_Glyff
     net: UNet2DModel
 
-    def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DPMSolverMultistepScheduler, **kwargs):
+    def __init__(self, *, noise_scheduler: DDPMScheduler, inference_scheduler: DDPMScheduler, **kwargs):
         super().__init__(**kwargs)
 
         self.noise_scheduler = noise_scheduler
@@ -47,39 +47,41 @@ class TrainModel_R2C_Glyffuser(TrainModelBase):
 
         pred_imgs = eval_pipeline(
             batch_size=self.config.eval_batch_size,
-            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            generator=torch.Generator(device=self.device if self.device != torch.device("mps") else "cpu").manual_seed(self.config.seed),
+            num_inference_steps=1000,
             output_type="numpy",
         ).images
+        pred_imgs = torch.from_numpy(pred_imgs.transpose((0, 3, 1, 2))).to(self.device) # NHWC numpy -> NCHW torch
 
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([pred_imgs_out])
 
-        return 0, grid_img, None
+        return 0, grid_img, None, {}, {"pred_imgs": pred_imgs}
 
-    def inference_step(self, input_data: None = None) -> Tuple[torch.Tensor, List[str] | None]:
+    def inference_step(self, input_data: None = None) -> Tuple[torch.Tensor, List[str] | None, Dict]:
         inference_pipeline = DDPMPipeline(unet=self.net, scheduler=self.inference_scheduler)
         inference_pipeline.set_progress_bar_config(desc="Generating inference image grid...")
 
         pred_imgs = inference_pipeline(
             batch_size=self.config.eval_batch_size,
-            generator=torch.Generator(device=self.device).manual_seed(self.config.seed),
-            num_inference_steps=self.inference_scheduler.num_inference_steps,
+            generator=torch.Generator(device=self.device if self.device != torch.device("mps") else "cpu").manual_seed(self.config.seed),
+            num_inference_steps=1000,
             output_type="numpy",
         ).images
+        pred_imgs = torch.from_numpy(pred_imgs.transpose((0, 3, 1, 2))).to(self.device) # NHWC numpy -> NCHW torch
 
-        pred_imgs_out = to_out_img(pred_imgs, (-1, 1))
+        pred_imgs_out = to_out_img(pred_imgs, (0, 1))
         grid_img = make_image_grid([pred_imgs_out])
 
-        return grid_img, None
+        return grid_img, None, {"pred_imgs": pred_imgs}
 
     def get_checkpoint_data(self) -> Dict:
         chkpt_data = super().get_checkpoint_data()
-        chkpt_data["noise_scheduler_state"] = self.noise_scheduler
-        chkpt_data["inference_scheduler_state"] = self.inference_scheduler
+        chkpt_data["noise_scheduler_config"] = dict(self.noise_scheduler.config)
+        chkpt_data["inference_scheduler_config"] = dict(self.inference_scheduler.config)
         return chkpt_data
 
     def load_checkpoint_data(self, chkpt_data: Dict, phase: str):
         super().load_checkpoint_data(chkpt_data, phase)
-        self.noise_scheduler = chkpt_data["noise_scheduler_state"]
-        self.inference_scheduler = chkpt_data["inference_scheduler_state"]
+        self.noise_scheduler = DDPMScheduler.from_config(chkpt_data["noise_scheduler_config"])
+        self.inference_scheduler = DDPMScheduler.from_config(chkpt_data["inference_scheduler_config"])

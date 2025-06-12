@@ -18,9 +18,7 @@ def test_c2c_palette(cfg: TrainConfig_C2C_Palette):
     )
     model.load_checkpoint("test")
 
-    test_metrics = model.test()
-
-    return test_metrics
+    return model.test()
 
 
 @click.command()
