@@ -1,7 +1,8 @@
 import rich_click as click
 
 from core.configs import TrainConfig_C2CBi_CycleGAN
-from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN, CycleGANNetwork
+from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN
+from cyclegan_and_pix2pix.cyclegan_network import CycleGANNetwork
 
 
 def test_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):

@@ -3,8 +3,9 @@ from typing import Sequence
 import rich_click as click
 
 from core.configs import TrainConfig_C2CBi_CycleGAN
-from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN, CycleGANNetwork
+from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN
 from core.utils.image_utils import chars_to_image_tensor
+from cyclegan_and_pix2pix.cyclegan_network import CycleGANNetwork
 
 
 def inference_c2cbi_cyclegan(
@@ -15,7 +16,7 @@ def inference_c2cbi_cyclegan(
 ):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for inference"
 
-    src_imgs = chars_to_image_tensor(input_chars, cfg.image_size, font_name, font_size)
+    src_imgs = chars_to_image_tensor(input_chars, cfg, font_name, font_size)
 
     # Create the composite network
     net = CycleGANNetwork(cfg)

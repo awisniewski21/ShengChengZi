@@ -18,7 +18,7 @@ def inference_c2cbi_scz(
 ):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for inference"
 
-    src_imgs = chars_to_image_tensor(input_chars, cfg.image_size, font_name, font_size)
+    src_imgs = chars_to_image_tensor(input_chars, cfg, font_name, font_size)
     labels = torch.tensor([direction] * len(input_chars))
 
     net = UNet2DModel(    

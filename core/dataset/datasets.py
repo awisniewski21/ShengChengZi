@@ -9,10 +9,10 @@ from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.data.dataloader import default_collate
-from torchvision import transforms
 from torchvision.datasets.folder import IMG_EXTENSIONS
 
 from core.configs import TrainConfigBase
+from core.utils.image_utils import get_image_transform
 from glyffuser import t5
 
 
@@ -134,13 +134,8 @@ class ImageCollator:
         else:
             return default_collate(batch_samples)
 
-
 def get_dataset(cfg: TrainConfigBase, *args, **kwargs) -> Dataset:
-    transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((cfg.image_size, cfg.image_size)),
-        transforms.ToTensor(),
-    ])
+    transform = get_image_transform(cfg)
 
     cfg.dataset_task = cfg.dataset_task.lower()
     if cfg.dataset_task == "rand2char":

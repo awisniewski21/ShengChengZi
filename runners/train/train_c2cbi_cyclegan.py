@@ -4,7 +4,8 @@ import rich_click as click
 import torch
 
 from core.configs import TrainConfig_C2CBi_CycleGAN
-from core.models.c2cbi_cyclegan import CycleGANNetwork, TrainModel_C2CBi_CycleGAN
+from core.models.c2cbi_cyclegan import TrainModel_C2CBi_CycleGAN
+from cyclegan_and_pix2pix.cyclegan_network import CycleGANNetwork
 
 
 def train_c2cbi_cyclegan(cfg: TrainConfig_C2CBi_CycleGAN):

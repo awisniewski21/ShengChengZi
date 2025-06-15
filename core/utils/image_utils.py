@@ -9,22 +9,36 @@ from skimage.metrics import structural_similarity as ssim
 from torchvision import transforms
 from torchvision.utils import make_grid
 
+from core.configs import TrainConfig_C2C_Palette, TrainConfigBase
 from core.dataset.dataset_utils import create_image
 from core.utils.repo_utils import get_repo_dir
 
 
-def chars_to_image_tensor(input_chars: List[str], image_size: int, font_name: str, font_size: int | None) -> torch.Tensor:
-    font_path = Path(get_repo_dir()) / "data" / "fonts" / f"{font_name}.ttf"
-    font_size = font_size if font_size is not None else int(100 * (image_size / 128))
-    font = ImageFont.truetype(font_path, font_size)
-
-    transform = transforms.Compose([
+def get_image_transform(cfg: TrainConfigBase) -> transforms.Compose:
+    """
+    Returns a composed image transform based on the training configuration
+    """
+    image_transforms = [
         transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-    ])
+        transforms.Resize((cfg.image_size, cfg.image_size)),
+        transforms.ToTensor(), # (H, W, C) [0, 255] -> (C, H, W) [0, 1]
+    ]
+    if isinstance(cfg, TrainConfig_C2C_Palette):
+        image_transforms.append(transforms.Normalize(mean=(0.5,), std=(0.5,))) # [0, 1] -> [-1, 1]
+    return transforms.Compose(image_transforms)
 
-    return torch.stack([transform(create_image(c, image_size, font)) for c in input_chars])
+def chars_to_image_tensor(
+    input_chars: List[str],
+    cfg: TrainConfigBase,
+    font_name: str,
+    font_size: int | None,
+) -> torch.Tensor:
+    font_path = Path(get_repo_dir()) / "data" / "fonts" / f"{font_name}.ttf"
+    font_size = font_size if font_size is not None else int(100 * (cfg.image_size / 128))
+    font = ImageFont.truetype(font_path, font_size)
+    transform = get_image_transform(cfg)
+
+    return torch.stack([transform(create_image(c, cfg.image_size, font)) for c in input_chars])
 
 def to_out_img(img: torch.Tensor | np.ndarray, value_range: Tuple[int, int]) -> torch.Tensor:
     if isinstance(img, np.ndarray):

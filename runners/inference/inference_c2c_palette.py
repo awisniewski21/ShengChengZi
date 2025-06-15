@@ -16,7 +16,7 @@ def inference_c2c_palette(
 ):
     assert cfg.load_checkpoint_path is not None, "Checkpoint path must be provided for evaluation"
 
-    src_imgs = chars_to_image_tensor(input_chars, cfg.image_size, font_name, font_size)
+    src_imgs = chars_to_image_tensor(input_chars, cfg, font_name, font_size)
 
     net = PaletteNetwork(config=cfg)
 

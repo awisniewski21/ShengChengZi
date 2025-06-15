@@ -239,7 +239,8 @@ class TrainModelBase(ABC):
         """
         Load a model from a checkpoint file
         """
-        chkpt_data = torch.load(self.config.load_checkpoint_path, map_location=self.device)
+        with torch.serialization.safe_globals([np.core.multiarray.scalar, np.dtype, np.dtypes.Float64DType]):
+            chkpt_data = torch.load(self.config.load_checkpoint_path, map_location=self.device)
         self.load_checkpoint_data(chkpt_data, phase)
         print(f"Loaded checkpoint from {self.config.load_checkpoint_path}")
         print(f"  Resuming from epoch {self.current_epoch}, step {self.global_step}")
